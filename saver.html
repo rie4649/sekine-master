@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>関根スクリーンセーバー</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; background:#000; overflow:hidden; font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif; }
+.frame-wrap { position:fixed; inset:0; }
+.frame-wrap iframe {
+  position:absolute; inset:0; width:100%; height:100%; border:none;
+  opacity:0; transition:opacity .8s; pointer-events:none; background:#fff;
+}
+.frame-wrap iframe.active { opacity:1; }
+/* 夜間モード */
+#nightScreen {
+  display:none; position:fixed; inset:0; background:#000; z-index:100;
+  flex-direction:column; align-items:center; justify-content:center; gap:18px;
+}
+#nightScreen.show { display:flex; }
+#nightClock { font-size:15vw; font-weight:200; color:#3a4a5a; letter-spacing:4px; font-variant-numeric:tabular-nums; }
+#nightDate { font-size:3.5vw; color:#26323e; font-weight:300; }
+#nightLabel { position:fixed; bottom:24px; font-size:2vw; color:#1c252e; }
+/* 起動ボタン(初回タップ用) */
+#startScreen {
+  position:fixed; inset:0; background:#0a1020; z-index:200;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; color:#fff;
+}
+#startScreen h1 { font-size:5vw; font-weight:700; }
+#startScreen p { font-size:2.2vw; color:#8aa; }
+#startBtn { padding:20px 60px; font-size:3vw; border:none; border-radius:16px; background:#14b8a6; color:#fff; font-weight:700; }
+</style>
+</head>
+<body>
+
+<div id="startScreen">
+  <h1>🖥 関根スクリーンセーバー</h1>
+  <p>タップして開始(画面は自動で点いたままになります)</p>
+  <button id="startBtn" onclick="startSaver()">開始</button>
+</div>
+
+<div class="frame-wrap" id="frameWrap"></div>
+
+<div id="nightScreen">
+  <div id="nightClock">--:--</div>
+  <div id="nightDate"></div>
+  <div id="nightLabel">🌙 夜間省エネモード(朝になると自動で戻ります)</div>
+</div>
+
+<script>
+/* ======== 設定(ここを変えれば調整できます) ======== */
+const APPS = [
+  "https://rie4649.github.io/shanai-keijiban/",
+  "https://rie4649.github.io/buji-buihan/",
+  "https://rie4649.github.io/gaichu-schedule/",
+  "https://rie4649.github.io/denwa-irai/"
+];
+const ROTATE_SEC = 10;      // 何秒ごとに切り替えるか
+const NIGHT_START = 19;     // 夜間モード開始(19 = 19時)
+const NIGHT_END = 6;        // 夜間モード終了(6 = 朝6時)
+/* ================================================ */
+
+let frames = [];
+let current = 0;
+let rotateTimer = null;
+let nightMode = false;
+let framesLoaded = false;
+
+function isNightNow() {
+  const h = new Date().getHours();
+  return (h >= NIGHT_START || h < NIGHT_END);
+}
+
+function loadFrames() {
+  const wrap = document.getElementById("frameWrap");
+  wrap.innerHTML = "";
+  frames = APPS.map((url, i) => {
+    const f = document.createElement("iframe");
+    f.src = url;
+    if (i === 0) f.classList.add("active");
+    wrap.appendChild(f);
+    return f;
+  });
+  current = 0;
+  framesLoaded = true;
+}
+
+function unloadFrames() {
+  document.getElementById("frameWrap").innerHTML = "";
+  frames = [];
+  framesLoaded = false;
+}
+
+function rotate() {
+  if (nightMode || frames.length === 0) return;
+  frames[current].classList.remove("active");
+  current = (current + 1) % frames.length;
+  frames[current].classList.add("active");
+}
+
+function enterNight() {
+  nightMode = true;
+  unloadFrames(); // 通信を完全に止める(Firestore読み取りゼロ)
+  document.getElementById("nightScreen").classList.add("show");
+}
+
+function exitNight() {
+  nightMode = false;
+  document.getElementById("nightScreen").classList.remove("show");
+  loadFrames(); // 朝一番に読み込み直すので、日付や天気も最新になる
+}
+
+function updateClock() {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  document.getElementById("nightClock").textContent = hh + ":" + mm;
+  const w = ["日","月","火","水","木","金","土"][d.getDay()];
+  document.getElementById("nightDate").textContent =
+    d.getFullYear() + "年" + (d.getMonth()+1) + "月" + d.getDate() + "日（" + w + "）";
+}
+
+function tick() {
+  updateClock();
+  const night = isNightNow();
+  if (night && !nightMode) enterNight();
+  if (!night && nightMode) exitNight();
+}
+
+/* 画面を消させない(Wake Lock) */
+let wakeLock = null;
+async function requestWakeLock() {
+  try {
+    if ("wakeLock" in navigator) {
+      wakeLock = await navigator.wakeLock.request("screen");
+    }
+  } catch (e) { console.log("WakeLock:", e); }
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") requestWakeLock();
+});
+
+function startSaver() {
+  document.getElementById("startScreen").style.display = "none";
+  requestWakeLock();
+  updateClock();
+  if (isNightNow()) { enterNight(); } else { loadFrames(); }
+  rotateTimer = setInterval(rotate, ROTATE_SEC * 1000);
+  setInterval(tick, 15000); // 15秒ごとに昼夜チェック
+  setInterval(updateClock, 5000);
+}
+</script>
+</body>
+</html>
