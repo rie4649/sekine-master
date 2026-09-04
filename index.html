@@ -194,6 +194,7 @@
   <div id="contractDispChips" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;"></div>
   <div id="contractKanaChips" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;"></div>
   <button class="btn btn-sub" style="width:100%;margin-bottom:6px;" onclick="openBulkFix()">🔧 表示中の契約をまとめて修正（処分先名・シート名）</button>
+  <button class="btn btn-sub" style="width:100%;margin-bottom:6px;background:#fee2e2;color:#b91c1c;" onclick="runBulkDelete()">🗑 表示中の契約をまとめて削除（貼り直し用）</button>
   <button class="btn btn-main" style="width:100%;margin-bottom:6px;" onclick="openContractImport()">📥 Excel貼り付けで一括登録</button>
   <button class="btn btn-sub" style="width:100%;margin-bottom:10px;" onclick="addContractManually()">＋ 1件だけ追加</button>
   <div id="contractList"><div style="text-align:center;color:#94a3b8;padding:20px;">読み込み中...</div></div>
@@ -830,26 +831,52 @@ function getFilteredContracts(q){
     (c.sheet || "").includes(q) || (c.note || "").includes(q) || (companyYomi[c.company] || "").includes(q));
   return list;
 }
-window.openBulkFix = function(){
+function bulkTargetOrNull(){
   const q = (document.getElementById("contractSearchBox").value || "").trim();
+  if (mDispFilter === "" && !mKanaFilter && !q) {
+    alert("⚠ 今は「すべて」が表示されていて、全契約が対象になってしまいます。\n\n先に①処分先タブを選ぶ か ②検索欄にシート名や会社名を入れて、直したい契約だけを表示してから使ってください");
+    return null;
+  }
   const list = getFilteredContracts(q).filter(c => !c.isMemo);
-  if (!list.length) { alert("表示中の契約がありません。処分先タブや検索で対象を絞ってから使ってください"); return; }
+  if (!list.length) { alert("表示中の契約がありません"); return null; }
+  return list;
+}
+window.openBulkFix = function(){
+  const list = bulkTargetOrNull();
+  if (!list) return;
   const disps = Array.from(new Set(list.map(c => ctDispOf(c) || "（不明）")));
+  const sheets = Array.from(new Set(list.map(c => c.sheet || "")));
   document.getElementById("bulkFixInfo").innerHTML =
-    "対象：<b>" + list.length + "件</b>（今の絞り込み・検索に表示されている契約）<br>現在の処分先：" + disps.map(esc).join("、") +
-    "<br><span style='color:#64748b;'>例：「\"フロンティア」タブを選んでから、新しい処分先名に (株)フロンティアスピリット と入れると37件が一度に直ります</span>";
+    "<div style='background:#fef3c7;border-radius:8px;padding:8px;margin-bottom:8px;'>いま画面に表示されている <b style='font-size:15px;'>" + list.length + "件</b> の契約が、まとめて書き換わります。<br>件数が多すぎるときはキャンセルして、タブや検索でもっと絞ってください</div>" +
+    "対象のシート：" + sheets.map(esc).join("、") + "<br>対象の処分先：" + disps.map(esc).join("、");
   document.getElementById("bfDisposer").value = "";
   document.getElementById("bfSheet").value = "";
   document.getElementById("bulkFixBg").classList.add("show");
+};
+window.runBulkDelete = async function(){
+  const list = bulkTargetOrNull();
+  if (!list) return;
+  const sheets = Array.from(new Set(list.map(c => c.sheet || "")));
+  if (!confirm("表示中の " + list.length + "件（シート：" + sheets.join("、") + "）を削除します。\nExcelから貼り直す前のリセット用です。よろしいですか？")) return;
+  if (!confirm("本当に削除しますか？ 元に戻すにはExcelからの貼り直しが必要です")) return;
+  try {
+    for (let i = 0; i < list.length; i += 400) {
+      const batch = db.batch();
+      list.slice(i, i + 400).forEach(c => batch.delete(db.collection(CONTRACT_COL).doc(c.id)));
+      await batch.commit();
+    }
+    toast(list.length + "件を削除しました。Excelから貼り直してください");
+    mDispFilter = "";
+    await loadContracts(true);
+  } catch (e) { alert("削除に失敗しました: " + e.message); }
 };
 window.closeBulkFix = function(){ document.getElementById("bulkFixBg").classList.remove("show"); };
 window.runBulkFix = async function(){
   const newDisp = document.getElementById("bfDisposer").value.trim();
   const newSheet = document.getElementById("bfSheet").value.trim();
   if (!newDisp && !newSheet) { alert("処分先名かシート名のどちらかを入力してください"); return; }
-  const q = (document.getElementById("contractSearchBox").value || "").trim();
-  const list = getFilteredContracts(q).filter(c => !c.isMemo);
-  if (!list.length) return;
+  const list = bulkTargetOrNull();
+  if (!list) return;
   if (!confirm(list.length + "件を変更します。よろしいですか？")) return;
   const btn = document.getElementById("bfRunBtn");
   btn.disabled = true;
