@@ -193,28 +193,10 @@
   <div id="contractSummary" style="font-size:12px;color:#64748b;margin:8px 0;"></div>
   <div id="contractDispChips" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;"></div>
   <div id="contractKanaChips" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;"></div>
-  <button class="btn btn-sub" style="width:100%;margin-bottom:6px;" onclick="openBulkFix()">🔧 表示中の契約をまとめて修正（処分先名・シート名）</button>
-  <button class="btn btn-sub" style="width:100%;margin-bottom:6px;background:#fee2e2;color:#b91c1c;" onclick="runBulkDelete()">🗑 表示中の契約をまとめて削除（貼り直し用）</button>
-  <button class="btn btn-sub" style="width:100%;margin-bottom:6px;background:#fecaca;color:#7f1d1d;font-weight:700;" onclick="runFullReset()">🚨 契約データを全消去してやり直す（特記事項・よみがなは残る）</button>
-  <button class="btn btn-main" style="width:100%;margin-bottom:6px;" onclick="openContractImport()">📥 Excel貼り付けで一括登録</button>
-  <button class="btn btn-sub" style="width:100%;margin-bottom:10px;" onclick="addContractManually()">＋ 1件だけ追加</button>
+  <button class="btn btn-sub" style="width:100%;margin-bottom:10px;" onclick="addContractManually()">＋ 契約を追加</button>
   <div id="contractList"><div style="text-align:center;color:#94a3b8;padding:20px;">読み込み中...</div></div>
 </div>
 </div><!-- /tabContracts -->
-
-<!-- 契約 一括修正モーダル -->
-<div class="modal-bg" id="bulkFixBg" onclick="if(event.target===this)closeBulkFix()">
-  <div class="modal">
-    <h3>🔧 まとめて修正</h3>
-    <div id="bulkFixInfo" style="font-size:13px;color:#334155;margin-bottom:10px;"></div>
-    <div class="field"><label>新しい処分先名（空欄＝変えない）</label><input type="text" id="bfDisposer" placeholder="例：(株)フロンティアスピリット"></div>
-    <div class="field"><label>新しいシート名（空欄＝変えない）</label><input type="text" id="bfSheet" placeholder="例：汚泥"></div>
-    <div class="modal-btns">
-      <button class="btn btn-sub" onclick="closeBulkFix()">キャンセル</button>
-      <button class="btn btn-main" id="bfRunBtn" onclick="runBulkFix()">まとめて変更</button>
-    </div>
-  </div>
-</div>
 
 <!-- 契約 編集モーダル -->
 <div class="modal-bg" id="contractEditBg" onclick="if(event.target===this)closeContractEdit()">
@@ -234,25 +216,7 @@
   </div>
 </div>
 
-<!-- 契約 取り込みモーダル -->
-<div class="modal-bg" id="contractImportBg" onclick="if(event.target===this)closeContractImport()">
-  <div class="modal" style="max-height:90vh;overflow-y:auto;">
-    <h3>📥 Excel貼り付けで一括登録</h3>
-    <div class="field"><label>シート名（品目カテゴリ。例：廃プラ、汚泥）</label><input type="text" id="ciSheet" placeholder="例：廃プラ"></div>
-    <div class="field"><label>Excelの表を丸ごとコピーして貼り付け（見出し行ごとでOK）</label>
-      <textarea id="ciPaste" rows="8" style="width:100%;font-size:12px;padding:8px;border:1px solid #d9d9e3;border-radius:10px;box-sizing:border-box;" oninput="previewContractImport()"></textarea>
-    </div>
-    <div class="field" style="display:flex;gap:10px;">
-      <div style="flex:1;"><label>見出しの行数</label><select id="ciHeaderRows" onchange="previewContractImport()" style="width:100%;padding:8px;border:1px solid #d9d9e3;border-radius:8px;"><option value="auto">自動</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
-      <div style="flex:1;"><label>会社名の列</label><select id="ciCompanyCol" onchange="previewContractImport()" style="width:100%;padding:8px;border:1px solid #d9d9e3;border-radius:8px;"><option value="auto">自動</option><option value="0">1列目</option><option value="1">2列目</option><option value="2">3列目</option></select></div>
-    </div>
-    <div id="ciPreview" style="font-size:12px;color:#334155;background:#f8fafc;border-radius:10px;padding:10px;margin:8px 0;max-height:30vh;overflow-y:auto;">貼り付けるとここにプレビューが出ます</div>
-    <div class="modal-btns">
-      <button class="btn btn-sub" onclick="closeContractImport()">キャンセル</button>
-      <button class="btn btn-main" id="ciImportBtn" onclick="runContractImport()" disabled>取り込む</button>
-    </div>
-  </div>
-</div>
+
 
 <!-- 取引先編集モーダル -->
 <div class="modal-bg" id="clientModalBg" onclick="if(event.target===this)closeClientEdit()">
@@ -720,6 +684,7 @@ async function loadContracts(force){
 let mDispFilter = ""; // ""=すべて / "＿unknown＿" / "＿memo＿" / 処分先名
 let mDispVals = [];
 let mCompNames = [];
+let mCompGroups = [];
 let mKanaFilter = "";
 let companyYomi = {};
 const M_KANA_ROWS = [
@@ -763,17 +728,19 @@ window.toggleMCt = function(id){
   el.style.display = (el.style.display === "none") ? "block" : "none";
 };
 window.editCompanyYomiIdx = async function(i){
-  const name = mCompNames[i];
-  if (!name || name === "（特記事項）") return;
-  const y = prompt(name + " のよみがな（ひらがな）", companyYomi[name] || "");
+  const g = mCompGroups[i];
+  if (!g || g.isMemo) return;
+  const y = prompt(g.names.join("／") + " のよみがな（ひらがな）\n※同じよみがなの会社は1つの排出事業者としてまとまります", g.yomi || "");
   if (y === null) return;
   try {
-    if (y.trim()) {
-      await db.collection(YOMI_COL).doc(yomiDocId(name)).set({ name, yomi: y.trim() });
-      companyYomi[name] = y.trim();
-    } else {
-      await db.collection(YOMI_COL).doc(yomiDocId(name)).delete();
-      delete companyYomi[name];
+    for (const name of g.names) {
+      if (y.trim()) {
+        await db.collection(YOMI_COL).doc(yomiDocId(name)).set({ name, yomi: y.trim() });
+        companyYomi[name] = y.trim();
+      } else {
+        await db.collection(YOMI_COL).doc(yomiDocId(name)).delete();
+        delete companyYomi[name];
+      }
     }
     renderContracts();
     toast("よみがなを保存しました");
@@ -793,7 +760,8 @@ window.openContractEdit = function(id){
 };
 window.addContractForCompanyIdx = function(i){
   openContractEdit(null);
-  document.getElementById("ceCompany").value = mCompNames[i] === "（特記事項）" ? "" : mCompNames[i];
+  const g = mCompGroups[i];
+  document.getElementById("ceCompany").value = (g && !g.isMemo) ? g.names[0] : "";
 };
 window.closeContractEdit = function(){ document.getElementById("contractEditBg").classList.remove("show"); };
 window.saveContractEdit = async function(){
@@ -832,98 +800,6 @@ function getFilteredContracts(q){
     (c.sheet || "").includes(q) || (c.note || "").includes(q) || (companyYomi[c.company] || "").includes(q));
   return list;
 }
-function bulkTargetOrNull(){
-  const q = (document.getElementById("contractSearchBox").value || "").trim();
-  if (mDispFilter === "" && !mKanaFilter && !q) {
-    alert("⚠ 今は「すべて」が表示されていて、全契約が対象になってしまいます。\n\n先に①処分先タブを選ぶ か ②検索欄にシート名や会社名を入れて、直したい契約だけを表示してから使ってください");
-    return null;
-  }
-  const list = getFilteredContracts(q).filter(c => !c.isMemo);
-  if (!list.length) { alert("表示中の契約がありません"); return null; }
-  return list;
-}
-window.runFullReset = async function(){
-  const targets = contracts.filter(c => !c.isMemo);
-  if (!targets.length) { alert("消す契約がありません（すでに空です）"); return; }
-  if (!confirm("契約データ " + targets.length + "件を全部消して、Excelから貼り直せる状態にします。\n特記事項とよみがなは残ります。よろしいですか？")) return;
-  if (!confirm("本当に全消去しますか？（Excelがあれば貼り直しで戻せます）")) return;
-  try {
-    for (let i = 0; i < targets.length; i += 400) {
-      const batch = db.batch();
-      targets.slice(i, i + 400).forEach(c => batch.delete(db.collection(CONTRACT_COL).doc(c.id)));
-      await batch.commit();
-    }
-    toast("全消去しました。📥からシートごとに貼り直してください");
-    mDispFilter = ""; mKanaFilter = "";
-    document.getElementById("contractSearchBox").value = "";
-    await loadContracts(true);
-  } catch (e) { alert("削除に失敗しました: " + e.message); }
-};
-window.openBulkFix = function(){
-  const list = bulkTargetOrNull();
-  if (!list) return;
-  const disps = Array.from(new Set(list.map(c => ctDispOf(c) || "（不明）")));
-  const sheets = Array.from(new Set(list.map(c => c.sheet || "")));
-  document.getElementById("bulkFixInfo").innerHTML =
-    "<div style='background:#fef3c7;border-radius:8px;padding:8px;margin-bottom:8px;'>いま画面に表示されている <b style='font-size:15px;'>" + list.length + "件</b> の契約が、まとめて書き換わります。<br>件数が多すぎるときはキャンセルして、タブや検索でもっと絞ってください</div>" +
-    "対象のシート：" + sheets.map(esc).join("、") + "<br>対象の処分先：" + disps.map(esc).join("、");
-  document.getElementById("bfDisposer").value = "";
-  document.getElementById("bfSheet").value = "";
-  document.getElementById("bulkFixBg").classList.add("show");
-};
-window.runBulkDelete = async function(){
-  const list = bulkTargetOrNull();
-  if (!list) return;
-  const sheets = Array.from(new Set(list.map(c => c.sheet || "")));
-  if (!confirm("表示中の " + list.length + "件（シート：" + sheets.join("、") + "）を削除します。\nExcelから貼り直す前のリセット用です。よろしいですか？")) return;
-  if (!confirm("本当に削除しますか？ 元に戻すにはExcelからの貼り直しが必要です")) return;
-  try {
-    for (let i = 0; i < list.length; i += 400) {
-      const batch = db.batch();
-      list.slice(i, i + 400).forEach(c => batch.delete(db.collection(CONTRACT_COL).doc(c.id)));
-      await batch.commit();
-    }
-    toast(list.length + "件を削除しました。Excelから貼り直してください");
-    mDispFilter = "";
-    await loadContracts(true);
-  } catch (e) { alert("削除に失敗しました: " + e.message); }
-};
-window.closeBulkFix = function(){ document.getElementById("bulkFixBg").classList.remove("show"); };
-window.runBulkFix = async function(){
-  const newDisp = document.getElementById("bfDisposer").value.trim();
-  const newSheet = document.getElementById("bfSheet").value.trim();
-  if (!newDisp && !newSheet) { alert("処分先名かシート名のどちらかを入力してください"); return; }
-  const list = bulkTargetOrNull();
-  if (!list) return;
-  if (!confirm(list.length + "件を変更します。よろしいですか？")) return;
-  const btn = document.getElementById("bfRunBtn");
-  btn.disabled = true;
-  try {
-    for (let i = 0; i < list.length; i += 200) {
-      const batch = db.batch();
-      list.slice(i, i + 200).forEach(c => {
-        const item = ctItemOf(c);
-        const disposer = newDisp || ctDispOf(c);
-        const sheet = newSheet || c.sheet;
-        const route = disposer && item && item !== sheet ? disposer + "／" + item : (disposer || item);
-        const newId = contractDocId(sheet, c.company, route);
-        const data = { sheet, company: c.company, route, disposer, content: c.content || "", note: c.note || "", isMemo: false, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
-        batch.set(db.collection(CONTRACT_COL).doc(newId), data);
-        if (newId !== c.id) batch.delete(db.collection(CONTRACT_COL).doc(c.id));
-      });
-      await batch.commit();
-      btn.textContent = "変更中... " + Math.min(i + 200, list.length) + "/" + list.length;
-    }
-    closeBulkFix();
-    toast(list.length + "件を変更しました");
-    mDispFilter = "";
-    await loadContracts(true);
-  } catch (e) {
-    alert("変更に失敗しました: " + e.message);
-  } finally {
-    btn.disabled = false; btn.textContent = "まとめて変更";
-  }
-};
 function renderContracts(){
   const q = (document.getElementById("contractSearchBox").value || "").trim();
   // 処分先チップ（番号方式）
@@ -957,18 +833,36 @@ function renderContracts(){
   document.getElementById("contractSummary").textContent =
     "全体：会社 " + compSet.size + "社・契約 " + contracts.filter(c => !c.isMemo).length + "件（" +
     Object.keys(sheets).sort().map(s => s + " " + sheets[s] + "件").join("、") + "）　※会社名タップで契約内容、✏️で修正、「よみ」でひらがな登録";
-  // 会社ごと（よみがな順）
-  const byComp = {};
+  // 会社ごと（同じよみがな＝同じ排出事業者としてまとめる。よみがな順）
+  const groupsMap = {};
   list.forEach(c => {
-    const key = c.isMemo ? "（特記事項）" : c.company;
-    (byComp[key] = byComp[key] || []).push(c);
+    let key;
+    if (c.isMemo) key = "＿memo＿";
+    else { const y = companyYomi[c.company]; key = y ? "y:" + y : "n:" + c.company; }
+    if (!groupsMap[key]) groupsMap[key] = { names: [], items: [], isMemo: !!c.isMemo };
+    if (!c.isMemo && groupsMap[key].names.indexOf(c.company) < 0) groupsMap[key].names.push(c.company);
+    groupsMap[key].items.push(c);
   });
-  mCompNames = Object.keys(byComp).sort((a, b) => companyYomiOf(a).localeCompare(companyYomiOf(b), "ja"));
+  mCompGroups = Object.keys(groupsMap).map(k => {
+    const g = groupsMap[k];
+    return {
+      names: g.isMemo ? ["（特記事項）"] : g.names,
+      items: g.items,
+      isMemo: g.isMemo,
+      yomi: g.isMemo ? "" : (companyYomi[g.names[0]] || "")
+    };
+  });
+  mCompGroups.sort((a, b) => {
+    const ya = a.yomi || companyYomiOf(a.names[0]);
+    const yb = b.yomi || companyYomiOf(b.names[0]);
+    return ya.localeCompare(yb, "ja");
+  });
   const box = document.getElementById("contractList");
-  if (!mCompNames.length) { box.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:20px;">該当なし（📥から取り込めます）</div>'; return; }
-  box.innerHTML = mCompNames.map((name, idx) => {
-    const isMemoGroup = (name === "（特記事項）");
-    const rows = byComp[name].map(c => {
+  if (!mCompGroups.length) { box.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:20px;">該当なし（📥から取り込めます）</div>'; return; }
+  box.innerHTML = mCompGroups.map((g, idx) => {
+    const isMemoGroup = g.isMemo;
+    const label = g.names.join("／");
+    const rows = g.items.map(c => {
       const btns = '<div style="display:flex;flex-direction:column;gap:4px;">' +
         '<button onclick="openContractEdit(\'' + c.id + '\')" style="border:none;background:#e0f2fe;color:#0369a1;border-radius:8px;padding:4px 8px;font-size:12px;">✏️</button>' +
         '<button onclick="deleteContract(\'' + c.id + '\')" style="border:none;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:4px 8px;font-size:12px;">🗑</button></div>';
@@ -977,6 +871,7 @@ function renderContracts(){
       }
       return '<div style="border-bottom:1px dashed #e2e8f0;padding:6px 0;display:flex;gap:6px;align-items:flex-start;">' +
         '<div style="flex:1;font-size:12px;line-height:1.7;">' +
+        (g.names.length > 1 ? '<span style="color:#94a3b8;">［' + esc(c.company) + '］</span><br>' : '') +
         '<b>品名：</b>' + esc(ctItemOf(c)) + '<span style="color:#94a3b8;">（' + esc(c.sheet) + '）</span><br>' +
         '<b>処分先：</b>' + (ctDispOf(c) ? esc(ctDispOf(c)) : '<span style="color:#ef4444;">（不明・✏️で入力できます）</span>') + '<br>' +
         '<b>契約日：</b>' + esc(contractContentDisp(c.content)) +
@@ -985,12 +880,11 @@ function renderContracts(){
     }).join("");
     const detailId = "mctd" + idx;
     const open = (isMemoGroup || q || mDispFilter === "＿memo＿" || mDispFilter === "＿unknown＿") ? "block" : "none";
-    const yomi = companyYomi[name];
-    const dspList = isMemoGroup ? "" : Array.from(new Set(byComp[name].filter(c => !c.isMemo).map(c => ctDispOf(c) || "不明"))).join("・");
+    const dspList = isMemoGroup ? "" : Array.from(new Set(g.items.filter(c => !c.isMemo).map(c => ctDispOf(c) || "不明"))).join("・");
     return '<div style="border:1px solid #e2e8f0;border-radius:12px;padding:8px 10px;margin-bottom:8px;">' +
       '<div style="display:flex;align-items:center;gap:8px;">' +
-      '<div style="flex:1;font-size:13px;font-weight:700;cursor:pointer;" onclick="toggleMCt(\'' + detailId + '\')">' + esc(name) +
-      '<span style="color:#94a3b8;font-weight:400;font-size:11px;">　' + (yomi ? esc(yomi) : (isMemoGroup ? "" : "よみ未登録")) + '　' + byComp[name].length + '件 ▼</span>' +
+      '<div style="flex:1;font-size:13px;font-weight:700;cursor:pointer;" onclick="toggleMCt(\'' + detailId + '\')">' + esc(label) +
+      '<span style="color:#94a3b8;font-weight:400;font-size:11px;">　' + (g.yomi ? esc(g.yomi) : (isMemoGroup ? "" : "よみ未登録")) + '　' + g.items.length + '件 ▼</span>' +
       (dspList ? '<div style="font-size:11px;font-weight:400;color:#0d9488;">→ ' + esc(dspList) + '</div>' : '') + '</div>' +
       (isMemoGroup ? '' : '<button onclick="addContractForCompanyIdx(' + idx + ')" style="border:none;background:#d1fae5;color:#065f46;border-radius:8px;padding:5px 9px;font-size:11px;font-weight:700;">＋</button>' +
       '<button onclick="editCompanyYomiIdx(' + idx + ')" style="border:none;background:#fef3c7;color:#92400e;border-radius:8px;padding:5px 9px;font-size:11px;font-weight:700;">よみ</button>') +
@@ -1007,129 +901,6 @@ window.deleteContract = async function(id){
   toast("削除しました");
 };
 window.addContractManually = function(){ openContractEdit(null); };
-/* ---- 貼り付け取り込み ---- */
-let ciParsed = null;
-window.openContractImport = function(){
-  document.getElementById("ciPaste").value = "";
-  document.getElementById("ciPreview").textContent = "貼り付けるとここにプレビューが出ます";
-  document.getElementById("ciImportBtn").disabled = true;
-  ciParsed = null;
-  document.getElementById("contractImportBg").classList.add("show");
-};
-window.closeContractImport = function(){ document.getElementById("contractImportBg").classList.remove("show"); };
-function ciDetectCompanyCol(rows){
-  const scores = [0, 0, 0];
-  rows.forEach(r => {
-    for (let c = 0; c < 3; c++) {
-      const v = (r[c] || "").trim();
-      if (v.length >= 2) scores[c]++;
-    }
-  });
-  let best = 0;
-  for (let c = 1; c < 3; c++) if (scores[c] > scores[best]) best = c;
-  return best;
-}
-function ciDetectHeaderRows(rows, compCol){
-  // 上から見て「会社名列に2文字以上あり、かつ 運搬先/処分先 という語でない」最初の行までを見出しとする
-  for (let i = 0; i < Math.min(rows.length, 6); i++) {
-    const v = (rows[i][compCol] || "").trim();
-    if (v.length >= 2 && v !== "運搬先" && v !== "処分先" && v.indexOf("一覧") < 0) return i;
-  }
-  return 1;
-}
-window.previewContractImport = function(){
-  const text = document.getElementById("ciPaste").value;
-  const btn = document.getElementById("ciImportBtn");
-  const prev = document.getElementById("ciPreview");
-  if (!text.trim()) { prev.textContent = "貼り付けるとここにプレビューが出ます"; btn.disabled = true; ciParsed = null; return; }
-  const rows = text.replace(/\r/g, "").split("\n").map(l => l.split("\t"));
-  const compSel = document.getElementById("ciCompanyCol").value;
-  const compCol = (compSel === "auto") ? ciDetectCompanyCol(rows) : Number(compSel);
-  const hdrSel = document.getElementById("ciHeaderRows").value;
-  const headerRows = (hdrSel === "auto") ? ciDetectHeaderRows(rows, compCol) : Number(hdrSel);
-  // 列ラベル
-  const maxCols = Math.max.apply(null, rows.map(r => r.length));
-  const labels = [];
-  let noteCol = -1;
-  for (let c = compCol + 1; c < maxCols; c++) {
-    const parts = [];
-    for (let h = 0; h < headerRows; h++) {
-      const v = ((rows[h] || [])[c] || "").replace(/\n/g, " ").trim();
-      if (v) parts.push(v);
-    }
-    const label = parts.join("／");
-    labels[c] = label;
-    if (label.indexOf("備") >= 0 && label.indexOf("考") >= 0) noteCol = c;
-  }
-  // レコード化
-  const recs = [];
-  const memos = [];
-  for (let i = headerRows; i < rows.length; i++) {
-    const r = rows[i];
-    const company = (r[compCol] || "").trim();
-    if (!company) continue;
-    const note = noteCol >= 0 ? (r[noteCol] || "").trim() : "";
-    let found = 0;
-    for (let c = compCol + 1; c < maxCols; c++) {
-      if (c === noteCol) continue;
-      const v = (r[c] || "").trim();
-      if (!v) continue;
-      recs.push({ company, route: labels[c] || "", content: v, note });
-      found++;
-    }
-    if (!found) {
-      if (company.length >= 12 || note) memos.push({ company: "", content: company + (note ? "　" + note : "") });
-      else recs.push({ company, route: "", content: "（記載なし）", note });
-    }
-  }
-  ciParsed = { recs, memos };
-  const routeSet = {};
-  recs.forEach(x => { if (x.route) routeSet[x.route] = (routeSet[x.route] || 0) + 1; });
-  const routeKeys = Object.keys(routeSet);
-  const dispInputs = routeKeys.map(k => {
-    const guess = k.split("／")[0].trim();
-    return '<div style="display:flex;gap:6px;align-items:center;margin:3px 0;">' +
-      '<span style="flex:1;">' + esc(k) + '（' + routeSet[k] + '件）→</span>' +
-      '<input type="text" class="ciDispInput" data-route="' + esc(k) + '" value="' + esc(guess) + '" style="flex:1;padding:6px;border:1px solid #d9d9e3;border-radius:8px;font-size:12px;">' +
-      '</div>';
-  }).join("");
-  prev.innerHTML =
-    "見出し " + headerRows + "行・会社名は" + (compCol + 1) + "列目として読みました（違うときは上で変更）<br>" +
-    "<b>契約 " + recs.length + "件・特記 " + memos.length + "件</b><br>" +
-    "先頭の例：" + recs.slice(0, 3).map(x => esc(x.company) + "→" + esc(x.route) + "：" + esc(x.content)).join("　／　") +
-    (routeKeys.length ? '<div style="margin-top:8px;border-top:1px solid #e2e8f0;padding-top:6px;"><b>各列の処分先名</b>（自動で入れました。汚泥のように1段目が運搬先の表は、処分先の名前に直してください）' + dispInputs + '</div>' : "");
-  btn.disabled = (recs.length + memos.length === 0) || !document.getElementById("ciSheet").value.trim();
-};
-document.getElementById("ciSheet").addEventListener("input", previewContractImport);
-window.runContractImport = async function(){
-  if (!ciParsed) return;
-  const sheet = document.getElementById("ciSheet").value.trim();
-  if (!sheet) { alert("シート名を入力してください"); return; }
-  const btn = document.getElementById("ciImportBtn");
-  btn.disabled = true; btn.textContent = "取り込み中...";
-  try {
-    const dispMap = {};
-    document.querySelectorAll(".ciDispInput").forEach(inp => { dispMap[inp.dataset.route] = inp.value.trim(); });
-    const all = ciParsed.recs.map(r => ({ sheet, company: r.company, route: r.route, disposer: dispMap[r.route] || r.route.split("／")[0] || "", content: r.content, note: r.note || "", isMemo: false }))
-      .concat(ciParsed.memos.map(m => ({ sheet, company: "（特記）", route: "", content: m.content, note: "", isMemo: true })));
-    for (let i = 0; i < all.length; i += 400) {
-      const batch = db.batch();
-      all.slice(i, i + 400).forEach(d => {
-        const id = contractDocId(d.sheet, d.isMemo ? d.content : d.company, d.route);
-        batch.set(db.collection(CONTRACT_COL).doc(id), Object.assign({}, d, { updatedAt: firebase.firestore.FieldValue.serverTimestamp() }));
-      });
-      await batch.commit();
-      btn.textContent = "取り込み中... " + Math.min(i + 400, all.length) + "/" + all.length;
-    }
-    toast(all.length + "件を取り込みました");
-    closeContractImport();
-    await loadContracts(true);
-  } catch (e) {
-    alert("取り込みに失敗しました: " + e.message);
-  } finally {
-    btn.disabled = false; btn.textContent = "取り込む";
-  }
-};
 
 function toast(msg) {
   const t = document.getElementById("toast");
