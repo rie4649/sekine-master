@@ -198,6 +198,24 @@
 </div>
 </div><!-- /tabContracts -->
 
+<!-- 契約 編集モーダル -->
+<div class="modal-bg" id="contractEditBg" onclick="if(event.target===this)closeContractEdit()">
+  <div class="modal">
+    <h3>✏️ 契約を編集</h3>
+    <input type="hidden" id="ceId">
+    <div class="field"><label>会社名（排出事業者）</label><input type="text" id="ceCompany"></div>
+    <div class="field"><label>シート（品目カテゴリ）</label><input type="text" id="ceSheet"></div>
+    <div class="field"><label>処分先</label><input type="text" id="ceDisposer"></div>
+    <div class="field"><label>品名</label><input type="text" id="ceItem"></div>
+    <div class="field"><label>契約日・内容（〇＝日付不明）</label><input type="text" id="ceContent"></div>
+    <div class="field"><label>備考</label><input type="text" id="ceNote"></div>
+    <div class="modal-btns">
+      <button class="btn btn-sub" onclick="closeContractEdit()">キャンセル</button>
+      <button class="btn btn-main" onclick="saveContractEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- 契約 取り込みモーダル -->
 <div class="modal-bg" id="contractImportBg" onclick="if(event.target===this)closeContractImport()">
   <div class="modal" style="max-height:90vh;overflow-y:auto;">
@@ -671,80 +689,162 @@ function contractContentDisp(s){
 async function loadContracts(force){
   if (contractsLoaded && !force) { renderContracts(); return; }
   try {
-    const snap = await db.collection(CONTRACT_COL).get();
-    contracts = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    const results = await Promise.all([db.collection(CONTRACT_COL).get(), db.collection(YOMI_COL).get()]);
+    contracts = results[0].docs.map(d => Object.assign({ id: d.id }, d.data()));
+    companyYomi = {};
+    results[1].docs.forEach(d => { const v = d.data(); if (v.name) companyYomi[v.name] = v.yomi || ""; });
     contractsLoaded = true;
     renderContracts();
   } catch (e) {
     document.getElementById("contractList").innerHTML = '<div style="text-align:center;color:#ef4444;padding:20px;">読み込みに失敗しました</div>';
   }
 }
-let mDispFilter = "";
+let mDispFilter = ""; // ""=すべて / "＿unknown＿" / "＿memo＿" / 処分先名
+let mDispVals = [];
+let mCompNames = [];
+let companyYomi = {};
+const YOMI_COL = "master_company_yomi";
+function yomiDocId(name){ return encodeURIComponent(name).replace(/%/g, "_").slice(0, 1400); }
 function ctDispOf(c){ return (c.disposer || "").trim() || ((c.route || "").split("／")[0] || "").trim(); }
 function ctItemOf(c){
+  const disp = ctDispOf(c);
   const parts = (c.route || "").split("／").map(s => s.trim()).filter(Boolean);
-  const rest = parts.filter(p => p !== ctDispOf(c));
+  const rest = parts.filter(p => p !== disp);
   return rest.join("／") || c.sheet || "";
 }
-window.setMDisp = function(n){ mDispFilter = n; renderContracts(); };
+function companyYomiOf(name){
+  if (companyYomi[name]) return companyYomi[name];
+  const cl = clients.find(x => x.name === name);
+  if (cl && cl.yomi) return cl.yomi;
+  return "んんんん" + name;
+}
+window.setMDispIdx = function(i){ mDispFilter = mDispVals[i]; renderContracts(); };
 window.toggleMCt = function(id){
   const el = document.getElementById(id);
   el.style.display = (el.style.display === "none") ? "block" : "none";
 };
+window.editCompanyYomiIdx = async function(i){
+  const name = mCompNames[i];
+  if (!name || name === "（特記事項）") return;
+  const y = prompt(name + " のよみがな（ひらがな）", companyYomi[name] || "");
+  if (y === null) return;
+  try {
+    if (y.trim()) {
+      await db.collection(YOMI_COL).doc(yomiDocId(name)).set({ name, yomi: y.trim() });
+      companyYomi[name] = y.trim();
+    } else {
+      await db.collection(YOMI_COL).doc(yomiDocId(name)).delete();
+      delete companyYomi[name];
+    }
+    renderContracts();
+    toast("よみがなを保存しました");
+  } catch (e) { alert("保存できませんでした: " + e.message); }
+};
+window.openContractEdit = function(id){
+  const c = contracts.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById("ceId").value = id;
+  document.getElementById("ceCompany").value = c.isMemo ? "" : (c.company || "");
+  document.getElementById("ceSheet").value = c.sheet || "";
+  document.getElementById("ceDisposer").value = c.isMemo ? "" : ctDispOf(c);
+  document.getElementById("ceItem").value = c.isMemo ? "" : ctItemOf(c);
+  document.getElementById("ceContent").value = c.content || "";
+  document.getElementById("ceNote").value = c.note || "";
+  document.getElementById("contractEditBg").classList.add("show");
+};
+window.closeContractEdit = function(){ document.getElementById("contractEditBg").classList.remove("show"); };
+window.saveContractEdit = async function(){
+  const oldId = document.getElementById("ceId").value;
+  const old = contracts.find(x => x.id === oldId);
+  const company = document.getElementById("ceCompany").value.trim();
+  const sheet = document.getElementById("ceSheet").value.trim();
+  const disposer = document.getElementById("ceDisposer").value.trim();
+  const item = document.getElementById("ceItem").value.trim();
+  const content = document.getElementById("ceContent").value.trim();
+  const note = document.getElementById("ceNote").value.trim();
+  if (!sheet || (!company && !content)) { alert("シートと、会社名（または内容）を入力してください"); return; }
+  const isMemo = !company;
+  const route = isMemo ? "" : (disposer && item ? disposer + "／" + item : (disposer || item));
+  const keyName = isMemo ? content : company;
+  const newId = contractDocId(sheet, keyName, route);
+  const data = { sheet, company: isMemo ? "（特記）" : company, route, disposer, content, note, isMemo, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+  try {
+    await db.collection(CONTRACT_COL).doc(newId).set(data);
+    if (newId !== oldId) await db.collection(CONTRACT_COL).doc(oldId).delete();
+    contracts = contracts.filter(x => x.id !== oldId && x.id !== newId).concat([Object.assign({ id: newId }, data)]);
+    closeContractEdit();
+    renderContracts();
+    toast("保存しました");
+  } catch (e) { alert("保存できませんでした: " + e.message); }
+};
 function renderContracts(){
   const q = (document.getElementById("contractSearchBox").value || "").trim();
-  // 処分先チップ
+  // 処分先チップ（番号方式）
   const disps = {};
-  contracts.filter(c => !c.isMemo).forEach(c => { const d = ctDispOf(c) || "（処分先不明）"; disps[d] = (disps[d] || 0) + 1; });
+  let unknownCount = 0;
+  contracts.filter(c => !c.isMemo).forEach(c => {
+    const d = ctDispOf(c);
+    if (d) disps[d] = (disps[d] || 0) + 1; else unknownCount++;
+  });
   const memoCount = contracts.filter(c => c.isMemo).length;
   const dispNames = Object.keys(disps).sort((a, b) => a.localeCompare(b, "ja"));
-  const chip = (label, val, active) => '<button onclick="setMDisp(\'' + val.replace(/'/g, "\\'") + '\')" style="border:none;border-radius:10px;padding:7px 11px;font-size:12px;font-weight:700;' + (active ? 'background:#0d9488;color:#fff;' : 'background:#e2e8f0;color:#334155;') + '">' + esc(label) + '</button>';
-  document.getElementById("contractDispChips").innerHTML =
-    chip("すべて", "", mDispFilter === "") +
-    dispNames.map(n => chip(n + "（" + disps[n] + "）", n, mDispFilter === n)).join("") +
-    (memoCount ? chip("特記事項（" + memoCount + "）", "＿memo＿", mDispFilter === "＿memo＿") : "");
+  mDispVals = [""].concat(dispNames);
+  const labels = ["すべて"].concat(dispNames.map(n => n + "（" + disps[n] + "）"));
+  if (unknownCount) { mDispVals.push("＿unknown＿"); labels.push("処分先不明（" + unknownCount + "）"); }
+  if (memoCount) { mDispVals.push("＿memo＿"); labels.push("特記事項（" + memoCount + "）"); }
+  document.getElementById("contractDispChips").innerHTML = labels.map((lb, i) => {
+    const active = (mDispFilter === mDispVals[i]);
+    return '<button onclick="setMDispIdx(' + i + ')" style="border:none;border-radius:10px;padding:7px 11px;font-size:12px;font-weight:700;' + (active ? 'background:#0d9488;color:#fff;' : 'background:#e2e8f0;color:#334155;') + '">' + esc(lb) + '</button>';
+  }).join("");
   // 絞り込み
   let list = contracts;
   if (mDispFilter === "＿memo＿") list = list.filter(c => c.isMemo);
+  else if (mDispFilter === "＿unknown＿") list = list.filter(c => !c.isMemo && !ctDispOf(c));
   else if (mDispFilter) list = list.filter(c => !c.isMemo && ctDispOf(c) === mDispFilter);
   if (q) list = list.filter(c =>
-    (c.company || "").includes(q) || (c.route || "").includes(q) ||
-    (c.content || "").includes(q) || (c.sheet || "").includes(q) || (c.note || "").includes(q));
+    (c.company || "").includes(q) || (c.route || "").includes(q) || (c.content || "").includes(q) ||
+    (c.sheet || "").includes(q) || (c.note || "").includes(q) || (companyYomi[c.company] || "").includes(q));
   const compSet = new Set(contracts.filter(c => !c.isMemo).map(c => c.company));
   const sheets = {};
   contracts.forEach(c => { sheets[c.sheet] = (sheets[c.sheet] || 0) + 1; });
   document.getElementById("contractSummary").textContent =
     "全体：会社 " + compSet.size + "社・契約 " + contracts.filter(c => !c.isMemo).length + "件（" +
-    Object.keys(sheets).sort().map(s => s + " " + sheets[s] + "件").join("、") + "）　※会社名をタップすると契約内容が開きます";
-  // 会社ごと
+    Object.keys(sheets).sort().map(s => s + " " + sheets[s] + "件").join("、") + "）　※会社名タップで契約内容、✏️で修正、「よみ」でひらがな登録";
+  // 会社ごと（よみがな順）
   const byComp = {};
   list.forEach(c => {
     const key = c.isMemo ? "（特記事項）" : c.company;
     (byComp[key] = byComp[key] || []).push(c);
   });
-  const names = Object.keys(byComp).sort((a, b) => a.localeCompare(b, "ja"));
+  mCompNames = Object.keys(byComp).sort((a, b) => companyYomiOf(a).localeCompare(companyYomiOf(b), "ja"));
   const box = document.getElementById("contractList");
-  if (!names.length) { box.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:20px;">該当なし（📥から取り込めます）</div>'; return; }
-  box.innerHTML = names.map((name, idx) => {
+  if (!mCompNames.length) { box.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:20px;">該当なし（📥から取り込めます）</div>'; return; }
+  box.innerHTML = mCompNames.map((name, idx) => {
     const isMemoGroup = (name === "（特記事項）");
     const rows = byComp[name].map(c => {
+      const btns = '<div style="display:flex;flex-direction:column;gap:4px;">' +
+        '<button onclick="openContractEdit(\'' + c.id + '\')" style="border:none;background:#e0f2fe;color:#0369a1;border-radius:8px;padding:4px 8px;font-size:12px;">✏️</button>' +
+        '<button onclick="deleteContract(\'' + c.id + '\')" style="border:none;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:4px 8px;font-size:12px;">🗑</button></div>';
       if (c.isMemo) {
-        return '<div style="border-bottom:1px dashed #e2e8f0;padding:6px 0;display:flex;gap:6px;"><div style="flex:1;font-size:12px;"><span style="background:#e0f2fe;color:#0369a1;border-radius:6px;padding:1px 6px;font-weight:700;">' + esc(c.sheet) + '</span>　' + esc(c.content) + '</div><button onclick="deleteContract(\'' + c.id + '\')" style="border:none;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:4px 8px;font-size:12px;">🗑</button></div>';
+        return '<div style="border-bottom:1px dashed #e2e8f0;padding:6px 0;display:flex;gap:6px;"><div style="flex:1;font-size:12px;"><span style="background:#e0f2fe;color:#0369a1;border-radius:6px;padding:1px 6px;font-weight:700;">' + esc(c.sheet) + '</span>　' + esc(c.content) + '</div>' + btns + '</div>';
       }
       return '<div style="border-bottom:1px dashed #e2e8f0;padding:6px 0;display:flex;gap:6px;align-items:flex-start;">' +
         '<div style="flex:1;font-size:12px;line-height:1.7;">' +
         '<b>品名：</b>' + esc(ctItemOf(c)) + '<span style="color:#94a3b8;">（' + esc(c.sheet) + '）</span><br>' +
-        '<b>処分先：</b>' + esc(ctDispOf(c)) + '<br>' +
+        '<b>処分先：</b>' + (ctDispOf(c) ? esc(ctDispOf(c)) : '<span style="color:#ef4444;">（不明・✏️で入力できます）</span>') + '<br>' +
         '<b>契約日：</b>' + esc(contractContentDisp(c.content)) +
         (c.note ? '<br><span style="color:#b45309;">📝 備考：' + esc(c.note) + '</span>' : '') +
-        '</div>' +
-        '<button onclick="deleteContract(\'' + c.id + '\')" style="border:none;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:4px 8px;font-size:12px;">🗑</button></div>';
+        '</div>' + btns + '</div>';
     }).join("");
     const detailId = "mctd" + idx;
-    const open = isMemoGroup || q || mDispFilter === "＿memo＿" ? "block" : "none";
+    const open = (isMemoGroup || q || mDispFilter === "＿memo＿" || mDispFilter === "＿unknown＿") ? "block" : "none";
+    const yomi = companyYomi[name];
     return '<div style="border:1px solid #e2e8f0;border-radius:12px;padding:8px 10px;margin-bottom:8px;">' +
-      '<div style="font-size:13px;font-weight:700;cursor:pointer;" onclick="toggleMCt(\'' + detailId + '\')">' + esc(name) +
-      '<span style="color:#94a3b8;font-weight:400;font-size:11px;">　' + byComp[name].length + '件 ▼</span></div>' +
+      '<div style="display:flex;align-items:center;gap:8px;">' +
+      '<div style="flex:1;font-size:13px;font-weight:700;cursor:pointer;" onclick="toggleMCt(\'' + detailId + '\')">' + esc(name) +
+      '<span style="color:#94a3b8;font-weight:400;font-size:11px;">　' + (yomi ? esc(yomi) : (isMemoGroup ? "" : "よみ未登録")) + '　' + byComp[name].length + '件 ▼</span></div>' +
+      (isMemoGroup ? '' : '<button onclick="editCompanyYomiIdx(' + idx + ')" style="border:none;background:#fef3c7;color:#92400e;border-radius:8px;padding:5px 9px;font-size:11px;font-weight:700;">よみ</button>') +
+      '</div>' +
       '<div id="' + detailId + '" style="display:' + open + ';">' + rows + '</div></div>';
   }).join("");
 }
