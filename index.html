@@ -191,6 +191,7 @@
   <h2>📋 契約一覧（シート別・処分先ごと）</h2>
   <input type="text" id="contractSearchBox" placeholder="🔍 会社名・処分先・品目・シート名で検索" oninput="renderContracts()" style="width:100%;padding:10px;border:1px solid #d9d9e3;border-radius:10px;font-size:14px;box-sizing:border-box;">
   <div id="contractSummary" style="font-size:12px;color:#64748b;margin:8px 0;"></div>
+  <div id="contractDispChips" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;"></div>
   <button class="btn btn-main" style="width:100%;margin-bottom:6px;" onclick="openContractImport()">📥 Excel貼り付けで一括登録</button>
   <button class="btn btn-sub" style="width:100%;margin-bottom:10px;" onclick="addContractManually()">＋ 1件だけ追加</button>
   <div id="contractList"><div style="text-align:center;color:#94a3b8;padding:20px;">読み込み中...</div></div>
@@ -678,20 +679,44 @@ async function loadContracts(force){
     document.getElementById("contractList").innerHTML = '<div style="text-align:center;color:#ef4444;padding:20px;">読み込みに失敗しました</div>';
   }
 }
+let mDispFilter = "";
+function ctDispOf(c){ return (c.disposer || "").trim() || ((c.route || "").split("／")[0] || "").trim(); }
+function ctItemOf(c){
+  const parts = (c.route || "").split("／").map(s => s.trim()).filter(Boolean);
+  const rest = parts.filter(p => p !== ctDispOf(c));
+  return rest.join("／") || c.sheet || "";
+}
+window.setMDisp = function(n){ mDispFilter = n; renderContracts(); };
+window.toggleMCt = function(id){
+  const el = document.getElementById(id);
+  el.style.display = (el.style.display === "none") ? "block" : "none";
+};
 function renderContracts(){
   const q = (document.getElementById("contractSearchBox").value || "").trim();
+  // 処分先チップ
+  const disps = {};
+  contracts.filter(c => !c.isMemo).forEach(c => { const d = ctDispOf(c) || "（処分先不明）"; disps[d] = (disps[d] || 0) + 1; });
+  const memoCount = contracts.filter(c => c.isMemo).length;
+  const dispNames = Object.keys(disps).sort((a, b) => a.localeCompare(b, "ja"));
+  const chip = (label, val, active) => '<button onclick="setMDisp(\'' + val.replace(/'/g, "\\'") + '\')" style="border:none;border-radius:10px;padding:7px 11px;font-size:12px;font-weight:700;' + (active ? 'background:#0d9488;color:#fff;' : 'background:#e2e8f0;color:#334155;') + '">' + esc(label) + '</button>';
+  document.getElementById("contractDispChips").innerHTML =
+    chip("すべて", "", mDispFilter === "") +
+    dispNames.map(n => chip(n + "（" + disps[n] + "）", n, mDispFilter === n)).join("") +
+    (memoCount ? chip("特記事項（" + memoCount + "）", "＿memo＿", mDispFilter === "＿memo＿") : "");
+  // 絞り込み
   let list = contracts;
+  if (mDispFilter === "＿memo＿") list = list.filter(c => c.isMemo);
+  else if (mDispFilter) list = list.filter(c => !c.isMemo && ctDispOf(c) === mDispFilter);
   if (q) list = list.filter(c =>
     (c.company || "").includes(q) || (c.route || "").includes(q) ||
     (c.content || "").includes(q) || (c.sheet || "").includes(q) || (c.note || "").includes(q));
-  // シート別サマリー
+  const compSet = new Set(contracts.filter(c => !c.isMemo).map(c => c.company));
   const sheets = {};
   contracts.forEach(c => { sheets[c.sheet] = (sheets[c.sheet] || 0) + 1; });
-  const compSet = new Set(contracts.filter(c => !c.isMemo).map(c => c.company));
   document.getElementById("contractSummary").textContent =
     "全体：会社 " + compSet.size + "社・契約 " + contracts.filter(c => !c.isMemo).length + "件（" +
-    Object.keys(sheets).sort().map(s => s + " " + sheets[s] + "件").join("、") + "）";
-  // 会社ごとにまとめる
+    Object.keys(sheets).sort().map(s => s + " " + sheets[s] + "件").join("、") + "）　※会社名をタップすると契約内容が開きます";
+  // 会社ごと
   const byComp = {};
   list.forEach(c => {
     const key = c.isMemo ? "（特記事項）" : c.company;
@@ -700,19 +725,27 @@ function renderContracts(){
   const names = Object.keys(byComp).sort((a, b) => a.localeCompare(b, "ja"));
   const box = document.getElementById("contractList");
   if (!names.length) { box.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:20px;">該当なし（📥から取り込めます）</div>'; return; }
-  box.innerHTML = names.map(name => {
-    const rows = byComp[name].map(c => `
-      <div style="display:flex;gap:6px;align-items:flex-start;border-bottom:1px dashed #e2e8f0;padding:5px 0;">
-        <div style="flex:1;font-size:12px;">
-          <span style="background:#e0f2fe;color:#0369a1;border-radius:6px;padding:1px 6px;font-weight:700;">${esc(c.sheet)}</span>${c.disposer ? '　<span style="background:#dcfce7;color:#15803d;border-radius:6px;padding:1px 6px;font-weight:700;">' + esc(c.disposer) + '</span>' : ''}
-          ${c.route ? '<span style="font-weight:700;">　' + esc(c.route) + '</span>' : ''}
-          　${esc(contractContentDisp(c.content))}
-          ${c.note ? '<div style="color:#b45309;font-size:11px;">📝 ' + esc(c.note) + '</div>' : ''}
-        </div>
-        <button onclick="deleteContract('${c.id}')" style="border:none;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:4px 8px;font-size:12px;">🗑</button>
-      </div>`).join("");
-    return `<div style="border:1px solid #e2e8f0;border-radius:12px;padding:8px 10px;margin-bottom:8px;">
-      <div style="font-size:13px;font-weight:700;">${esc(name)}<span style="color:#94a3b8;font-weight:400;font-size:11px;">　${byComp[name].length}件</span></div>${rows}</div>`;
+  box.innerHTML = names.map((name, idx) => {
+    const isMemoGroup = (name === "（特記事項）");
+    const rows = byComp[name].map(c => {
+      if (c.isMemo) {
+        return '<div style="border-bottom:1px dashed #e2e8f0;padding:6px 0;display:flex;gap:6px;"><div style="flex:1;font-size:12px;"><span style="background:#e0f2fe;color:#0369a1;border-radius:6px;padding:1px 6px;font-weight:700;">' + esc(c.sheet) + '</span>　' + esc(c.content) + '</div><button onclick="deleteContract(\'' + c.id + '\')" style="border:none;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:4px 8px;font-size:12px;">🗑</button></div>';
+      }
+      return '<div style="border-bottom:1px dashed #e2e8f0;padding:6px 0;display:flex;gap:6px;align-items:flex-start;">' +
+        '<div style="flex:1;font-size:12px;line-height:1.7;">' +
+        '<b>品名：</b>' + esc(ctItemOf(c)) + '<span style="color:#94a3b8;">（' + esc(c.sheet) + '）</span><br>' +
+        '<b>処分先：</b>' + esc(ctDispOf(c)) + '<br>' +
+        '<b>契約日：</b>' + esc(contractContentDisp(c.content)) +
+        (c.note ? '<br><span style="color:#b45309;">📝 備考：' + esc(c.note) + '</span>' : '') +
+        '</div>' +
+        '<button onclick="deleteContract(\'' + c.id + '\')" style="border:none;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:4px 8px;font-size:12px;">🗑</button></div>';
+    }).join("");
+    const detailId = "mctd" + idx;
+    const open = isMemoGroup || q || mDispFilter === "＿memo＿" ? "block" : "none";
+    return '<div style="border:1px solid #e2e8f0;border-radius:12px;padding:8px 10px;margin-bottom:8px;">' +
+      '<div style="font-size:13px;font-weight:700;cursor:pointer;" onclick="toggleMCt(\'' + detailId + '\')">' + esc(name) +
+      '<span style="color:#94a3b8;font-weight:400;font-size:11px;">　' + byComp[name].length + '件 ▼</span></div>' +
+      '<div id="' + detailId + '" style="display:' + open + ';">' + rows + '</div></div>';
   }).join("");
 }
 window.deleteContract = async function(id){
