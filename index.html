@@ -192,11 +192,27 @@
   <input type="text" id="contractSearchBox" placeholder="🔍 会社名・処分先・品目・シート名で検索" oninput="renderContracts()" style="width:100%;padding:10px;border:1px solid #d9d9e3;border-radius:10px;font-size:14px;box-sizing:border-box;">
   <div id="contractSummary" style="font-size:12px;color:#64748b;margin:8px 0;"></div>
   <div id="contractDispChips" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;"></div>
+  <div id="contractKanaChips" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;"></div>
+  <button class="btn btn-sub" style="width:100%;margin-bottom:6px;" onclick="openBulkFix()">🔧 表示中の契約をまとめて修正（処分先名・シート名）</button>
   <button class="btn btn-main" style="width:100%;margin-bottom:6px;" onclick="openContractImport()">📥 Excel貼り付けで一括登録</button>
   <button class="btn btn-sub" style="width:100%;margin-bottom:10px;" onclick="addContractManually()">＋ 1件だけ追加</button>
   <div id="contractList"><div style="text-align:center;color:#94a3b8;padding:20px;">読み込み中...</div></div>
 </div>
 </div><!-- /tabContracts -->
+
+<!-- 契約 一括修正モーダル -->
+<div class="modal-bg" id="bulkFixBg" onclick="if(event.target===this)closeBulkFix()">
+  <div class="modal">
+    <h3>🔧 まとめて修正</h3>
+    <div id="bulkFixInfo" style="font-size:13px;color:#334155;margin-bottom:10px;"></div>
+    <div class="field"><label>新しい処分先名（空欄＝変えない）</label><input type="text" id="bfDisposer" placeholder="例：(株)フロンティアスピリット"></div>
+    <div class="field"><label>新しいシート名（空欄＝変えない）</label><input type="text" id="bfSheet" placeholder="例：汚泥"></div>
+    <div class="modal-btns">
+      <button class="btn btn-sub" onclick="closeBulkFix()">キャンセル</button>
+      <button class="btn btn-main" id="bfRunBtn" onclick="runBulkFix()">まとめて変更</button>
+    </div>
+  </div>
+</div>
 
 <!-- 契約 編集モーダル -->
 <div class="modal-bg" id="contractEditBg" onclick="if(event.target===this)closeContractEdit()">
@@ -465,7 +481,7 @@ function switchTab(tab) {
   document.getElementById("tabBtnVehicles").classList.toggle("active", tab === "vehicles");
   document.getElementById("tabBtnClients").classList.toggle("active", tab === "clients");
   document.getElementById("tabBtnContracts").classList.toggle("active", tab === "contracts");
-  if (tab === "contracts") loadContracts();
+  if (tab === "contracts") { mDispFilter = ""; mKanaFilter = ""; loadContracts(); }
 }
 
 /* ---------- 取引先マスタ ---------- */
@@ -702,7 +718,28 @@ async function loadContracts(force){
 let mDispFilter = ""; // ""=すべて / "＿unknown＿" / "＿memo＿" / 処分先名
 let mDispVals = [];
 let mCompNames = [];
+let mKanaFilter = "";
 let companyYomi = {};
+const M_KANA_ROWS = [
+{label:"あ",chars:"あいうえおぁぃぅぇぉ"},
+{label:"か",chars:"かきくけこがぎぐげご"},
+{label:"さ",chars:"さしすせそざじずぜぞ"},
+{label:"た",chars:"たちつてとだぢづでどっ"},
+{label:"な",chars:"なにぬねの"},
+{label:"は",chars:"はひふへほばびぶべぼぱぴぷぺぽ"},
+{label:"ま",chars:"まみむめも"},
+{label:"や",chars:"やゆよゃゅょ"},
+{label:"ら",chars:"らりるれろ"},
+{label:"わ",chars:"わをん"}
+];
+function mKanaOf(name){
+  const y = companyYomi[name] || ((clients.find(x => x.name === name) || {}).yomi || "");
+  if (!y) return "他";
+  const c = y.trim().charAt(0);
+  for (const r of M_KANA_ROWS) { if (r.chars.indexOf(c) >= 0) return r.label; }
+  return "他";
+}
+window.setMKana = function(k){ mKanaFilter = k; renderContracts(); };
 const YOMI_COL = "master_company_yomi";
 function yomiDocId(name){ return encodeURIComponent(name).replace(/%/g, "_").slice(0, 1400); }
 function ctDispOf(c){ return (c.disposer || "").trim() || ((c.route || "").split("／")[0] || "").trim(); }
@@ -741,16 +778,20 @@ window.editCompanyYomiIdx = async function(i){
   } catch (e) { alert("保存できませんでした: " + e.message); }
 };
 window.openContractEdit = function(id){
-  const c = contracts.find(x => x.id === id);
-  if (!c) return;
-  document.getElementById("ceId").value = id;
-  document.getElementById("ceCompany").value = c.isMemo ? "" : (c.company || "");
-  document.getElementById("ceSheet").value = c.sheet || "";
-  document.getElementById("ceDisposer").value = c.isMemo ? "" : ctDispOf(c);
-  document.getElementById("ceItem").value = c.isMemo ? "" : ctItemOf(c);
-  document.getElementById("ceContent").value = c.content || "";
-  document.getElementById("ceNote").value = c.note || "";
+  const c = id ? contracts.find(x => x.id === id) : null;
+  document.querySelector("#contractEditBg h3").textContent = c ? "✏️ 契約を編集" : "＋ 契約を追加";
+  document.getElementById("ceId").value = id || "";
+  document.getElementById("ceCompany").value = c ? (c.isMemo ? "" : (c.company || "")) : "";
+  document.getElementById("ceSheet").value = c ? (c.sheet || "") : "";
+  document.getElementById("ceDisposer").value = c ? (c.isMemo ? "" : ctDispOf(c)) : "";
+  document.getElementById("ceItem").value = c ? (c.isMemo ? "" : ctItemOf(c)) : "";
+  document.getElementById("ceContent").value = c ? (c.content || "") : "";
+  document.getElementById("ceNote").value = c ? (c.note || "") : "";
   document.getElementById("contractEditBg").classList.add("show");
+};
+window.addContractForCompanyIdx = function(i){
+  openContractEdit(null);
+  document.getElementById("ceCompany").value = mCompNames[i] === "（特記事項）" ? "" : mCompNames[i];
 };
 window.closeContractEdit = function(){ document.getElementById("contractEditBg").classList.remove("show"); };
 window.saveContractEdit = async function(){
@@ -770,12 +811,73 @@ window.saveContractEdit = async function(){
   const data = { sheet, company: isMemo ? "（特記）" : company, route, disposer, content, note, isMemo, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
   try {
     await db.collection(CONTRACT_COL).doc(newId).set(data);
-    if (newId !== oldId) await db.collection(CONTRACT_COL).doc(oldId).delete();
+    if (oldId && newId !== oldId) await db.collection(CONTRACT_COL).doc(oldId).delete();
     contracts = contracts.filter(x => x.id !== oldId && x.id !== newId).concat([Object.assign({ id: newId }, data)]);
     closeContractEdit();
     renderContracts();
     toast("保存しました");
   } catch (e) { alert("保存できませんでした: " + e.message); }
+};
+function getFilteredContracts(q){
+  let list = contracts;
+  if (mDispFilter === "＿memo＿") list = list.filter(c => c.isMemo);
+  else if (mDispFilter === "＿unknown＿") list = list.filter(c => !c.isMemo && !ctDispOf(c));
+  else if (mDispFilter) list = list.filter(c => !c.isMemo && ctDispOf(c) === mDispFilter);
+  else list = list.filter(c => !c.isMemo);
+  if (mKanaFilter) list = list.filter(c => !c.isMemo && mKanaOf(c.company) === mKanaFilter);
+  if (q) list = list.filter(c =>
+    (c.company || "").includes(q) || (c.route || "").includes(q) || (c.content || "").includes(q) ||
+    (c.sheet || "").includes(q) || (c.note || "").includes(q) || (companyYomi[c.company] || "").includes(q));
+  return list;
+}
+window.openBulkFix = function(){
+  const q = (document.getElementById("contractSearchBox").value || "").trim();
+  const list = getFilteredContracts(q).filter(c => !c.isMemo);
+  if (!list.length) { alert("表示中の契約がありません。処分先タブや検索で対象を絞ってから使ってください"); return; }
+  const disps = Array.from(new Set(list.map(c => ctDispOf(c) || "（不明）")));
+  document.getElementById("bulkFixInfo").innerHTML =
+    "対象：<b>" + list.length + "件</b>（今の絞り込み・検索に表示されている契約）<br>現在の処分先：" + disps.map(esc).join("、") +
+    "<br><span style='color:#64748b;'>例：「\"フロンティア」タブを選んでから、新しい処分先名に (株)フロンティアスピリット と入れると37件が一度に直ります</span>";
+  document.getElementById("bfDisposer").value = "";
+  document.getElementById("bfSheet").value = "";
+  document.getElementById("bulkFixBg").classList.add("show");
+};
+window.closeBulkFix = function(){ document.getElementById("bulkFixBg").classList.remove("show"); };
+window.runBulkFix = async function(){
+  const newDisp = document.getElementById("bfDisposer").value.trim();
+  const newSheet = document.getElementById("bfSheet").value.trim();
+  if (!newDisp && !newSheet) { alert("処分先名かシート名のどちらかを入力してください"); return; }
+  const q = (document.getElementById("contractSearchBox").value || "").trim();
+  const list = getFilteredContracts(q).filter(c => !c.isMemo);
+  if (!list.length) return;
+  if (!confirm(list.length + "件を変更します。よろしいですか？")) return;
+  const btn = document.getElementById("bfRunBtn");
+  btn.disabled = true;
+  try {
+    for (let i = 0; i < list.length; i += 200) {
+      const batch = db.batch();
+      list.slice(i, i + 200).forEach(c => {
+        const item = ctItemOf(c);
+        const disposer = newDisp || ctDispOf(c);
+        const sheet = newSheet || c.sheet;
+        const route = disposer && item && item !== sheet ? disposer + "／" + item : (disposer || item);
+        const newId = contractDocId(sheet, c.company, route);
+        const data = { sheet, company: c.company, route, disposer, content: c.content || "", note: c.note || "", isMemo: false, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+        batch.set(db.collection(CONTRACT_COL).doc(newId), data);
+        if (newId !== c.id) batch.delete(db.collection(CONTRACT_COL).doc(c.id));
+      });
+      await batch.commit();
+      btn.textContent = "変更中... " + Math.min(i + 200, list.length) + "/" + list.length;
+    }
+    closeBulkFix();
+    toast(list.length + "件を変更しました");
+    mDispFilter = "";
+    await loadContracts(true);
+  } catch (e) {
+    alert("変更に失敗しました: " + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "まとめて変更";
+  }
 };
 function renderContracts(){
   const q = (document.getElementById("contractSearchBox").value || "").trim();
@@ -796,14 +898,14 @@ function renderContracts(){
     const active = (mDispFilter === mDispVals[i]);
     return '<button onclick="setMDispIdx(' + i + ')" style="border:none;border-radius:10px;padding:7px 11px;font-size:12px;font-weight:700;' + (active ? 'background:#0d9488;color:#fff;' : 'background:#e2e8f0;color:#334155;') + '">' + esc(lb) + '</button>';
   }).join("");
+  // かなインデックス
+  const kanaLabels = [""].concat(M_KANA_ROWS.map(r => r.label)).concat(["他"]);
+  document.getElementById("contractKanaChips").innerHTML = kanaLabels.map(k => {
+    const active = (mKanaFilter === k);
+    return '<button onclick="setMKana(\'' + k + '\')" style="border:none;border-radius:10px;padding:7px 11px;font-size:12px;font-weight:700;' + (active ? 'background:#7c3aed;color:#fff;' : 'background:#ede9fe;color:#5b21b6;') + '">' + (k === "" ? "全て" : k) + '</button>';
+  }).join("");
   // 絞り込み
-  let list = contracts;
-  if (mDispFilter === "＿memo＿") list = list.filter(c => c.isMemo);
-  else if (mDispFilter === "＿unknown＿") list = list.filter(c => !c.isMemo && !ctDispOf(c));
-  else if (mDispFilter) list = list.filter(c => !c.isMemo && ctDispOf(c) === mDispFilter);
-  if (q) list = list.filter(c =>
-    (c.company || "").includes(q) || (c.route || "").includes(q) || (c.content || "").includes(q) ||
-    (c.sheet || "").includes(q) || (c.note || "").includes(q) || (companyYomi[c.company] || "").includes(q));
+  let list = getFilteredContracts(q);
   const compSet = new Set(contracts.filter(c => !c.isMemo).map(c => c.company));
   const sheets = {};
   contracts.forEach(c => { sheets[c.sheet] = (sheets[c.sheet] || 0) + 1; });
@@ -839,11 +941,14 @@ function renderContracts(){
     const detailId = "mctd" + idx;
     const open = (isMemoGroup || q || mDispFilter === "＿memo＿" || mDispFilter === "＿unknown＿") ? "block" : "none";
     const yomi = companyYomi[name];
+    const dspList = isMemoGroup ? "" : Array.from(new Set(byComp[name].filter(c => !c.isMemo).map(c => ctDispOf(c) || "不明"))).join("・");
     return '<div style="border:1px solid #e2e8f0;border-radius:12px;padding:8px 10px;margin-bottom:8px;">' +
       '<div style="display:flex;align-items:center;gap:8px;">' +
       '<div style="flex:1;font-size:13px;font-weight:700;cursor:pointer;" onclick="toggleMCt(\'' + detailId + '\')">' + esc(name) +
-      '<span style="color:#94a3b8;font-weight:400;font-size:11px;">　' + (yomi ? esc(yomi) : (isMemoGroup ? "" : "よみ未登録")) + '　' + byComp[name].length + '件 ▼</span></div>' +
-      (isMemoGroup ? '' : '<button onclick="editCompanyYomiIdx(' + idx + ')" style="border:none;background:#fef3c7;color:#92400e;border-radius:8px;padding:5px 9px;font-size:11px;font-weight:700;">よみ</button>') +
+      '<span style="color:#94a3b8;font-weight:400;font-size:11px;">　' + (yomi ? esc(yomi) : (isMemoGroup ? "" : "よみ未登録")) + '　' + byComp[name].length + '件 ▼</span>' +
+      (dspList ? '<div style="font-size:11px;font-weight:400;color:#0d9488;">→ ' + esc(dspList) + '</div>' : '') + '</div>' +
+      (isMemoGroup ? '' : '<button onclick="addContractForCompanyIdx(' + idx + ')" style="border:none;background:#d1fae5;color:#065f46;border-radius:8px;padding:5px 9px;font-size:11px;font-weight:700;">＋</button>' +
+      '<button onclick="editCompanyYomiIdx(' + idx + ')" style="border:none;background:#fef3c7;color:#92400e;border-radius:8px;padding:5px 9px;font-size:11px;font-weight:700;">よみ</button>') +
       '</div>' +
       '<div id="' + detailId + '" style="display:' + open + ';">' + rows + '</div></div>';
   }).join("");
@@ -856,20 +961,7 @@ window.deleteContract = async function(id){
   renderContracts();
   toast("削除しました");
 };
-window.addContractManually = async function(){
-  const sheet = prompt("シート名（例：廃プラ、汚泥）"); if (!sheet || !sheet.trim()) return;
-  const company = prompt("会社名（排出事業者）"); if (!company || !company.trim()) return;
-  const disposer = prompt("処分先名（例：(株)サイトー）"); if (disposer === null) return;
-  const route = prompt("列ラベル・品目など（処分先名だけでもOK）", disposer || ""); if (route === null) return;
-  const content = prompt("契約日・内容（例：2022.07.01、〇=日付不明）"); if (content === null) return;
-  const note = prompt("備考（不要なら空欄）", "") ; if (note === null) return;
-  const id = contractDocId(sheet.trim(), company.trim(), route.trim());
-  const data = { sheet: sheet.trim(), company: company.trim(), route: route.trim(), disposer: (disposer || "").trim(), content: (content || "").trim(), note: (note || "").trim(), isMemo: false, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
-  await db.collection(CONTRACT_COL).doc(id).set(data);
-  contracts = contracts.filter(x => x.id !== id).concat([Object.assign({ id }, data)]);
-  renderContracts();
-  toast("追加しました");
-};
+window.addContractManually = function(){ openContractEdit(null); };
 /* ---- 貼り付け取り込み ---- */
 let ciParsed = null;
 window.openContractImport = function(){
