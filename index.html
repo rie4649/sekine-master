@@ -199,8 +199,8 @@
 </div><!-- /tabContracts -->
 
 <!-- 契約 編集モーダル -->
-<div class="modal-bg" id="contractEditBg" onclick="if(event.target===this)closeContractEdit()">
-  <div class="modal">
+<div class="modal-bg" id="contractEditBg" style="align-items:center;padding:16px;" onclick="if(event.target===this)closeContractEdit()">
+  <div class="modal" style="border-radius:20px;">
     <h3>✏️ 契約を編集</h3>
     <input type="hidden" id="ceId">
     <div class="field"><label>会社名（排出事業者）</label><input type="text" id="ceCompany"></div>
@@ -764,6 +764,11 @@ window.addContractForCompanyIdx = function(i){
   document.getElementById("ceCompany").value = (g && !g.isMemo) ? g.names[0] : "";
 };
 window.closeContractEdit = function(){ document.getElementById("contractEditBg").classList.remove("show"); };
+document.querySelectorAll("#contractEditBg input").forEach(inp => {
+  inp.addEventListener("focus", function(){
+    setTimeout(() => { inp.scrollIntoView({ block: "center", behavior: "smooth" }); }, 300);
+  });
+});
 window.saveContractEdit = async function(){
   const oldId = document.getElementById("ceId").value;
   const old = contracts.find(x => x.id === oldId);
