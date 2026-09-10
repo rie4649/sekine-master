@@ -101,6 +101,7 @@
     <button class="tab-btn active" id="tabBtnVehicles" onclick="switchTab('vehicles')">🚚 車両</button>
     <button class="tab-btn" id="tabBtnClients" onclick="switchTab('clients')">🏢 取引先</button>
     <button class="tab-btn" id="tabBtnContracts" onclick="switchTab('contracts')">📋 契約</button>
+    <button class="tab-btn" id="tabBtnStaff" onclick="switchTab('staff')">👤 従業員</button>
   </div>
 </header>
 
@@ -223,6 +224,18 @@
   <div id="contractList"><div style="text-align:center;color:#94a3b8;padding:20px;">読み込み中...</div></div>
 </div>
 </div><!-- /tabContracts -->
+
+<div id="tabStaff" style="display:none;">
+<div class="section">
+  <h2>👤 従業員(全アプリ共通)</h2>
+  <div style="font-size:13px;color:#64748b;margin-bottom:10px;">ここで登録・並べ替えした従業員が、点検ラクラクの担当者・業務管理の従業員・引取先管理の担当者(社内)に反映されます。並び順もそのまま使われます。</div>
+  <div class="row" style="display:flex;gap:8px;">
+    <input type="text" id="addStaffName" placeholder="従業員名(例:関根太郎)" style="flex:1;">
+    <button class="btn btn-main" style="width:auto;padding:10px 18px;" onclick="addStaffMember()">追加</button>
+  </div>
+</div>
+<div id="staffListWrap" style="padding:0 12px;"></div>
+</div>
 
 <!-- 契約 編集モーダル -->
 <div class="modal-bg" id="contractEditBg" style="align-items:center;padding:16px;" onclick="if(event.target===this)closeContractEdit()">
@@ -493,12 +506,88 @@ function switchTab(tab) {
   document.getElementById("tabVehicles").style.display = (tab === "vehicles") ? "block" : "none";
   document.getElementById("tabClients").style.display = (tab === "clients") ? "block" : "none";
   document.getElementById("tabContracts").style.display = (tab === "contracts") ? "block" : "none";
+  document.getElementById("tabStaff").style.display = (tab === "staff") ? "block" : "none";
   document.getElementById("tabBtnVehicles").classList.toggle("active", tab === "vehicles");
   document.getElementById("tabBtnClients").classList.toggle("active", tab === "clients");
   document.getElementById("tabBtnContracts").classList.toggle("active", tab === "contracts");
+  document.getElementById("tabBtnStaff").classList.toggle("active", tab === "staff");
+  if (tab === "staff") loadStaffTab();
   if (tab === "contracts") { mDispFilter = ""; mSheetFilter = ""; mKanaFilter = ""; loadContracts(); }
   if (tab !== "clients" && routeMode) toggleRouteMode();
 }
+
+/* ---------- 従業員マスタ(業務管理のemployeesを共用) ---------- */
+const STAFF_COL = "employees";
+let staffMembers = [];
+let staffLoaded = false;
+function loadStaffTab() {
+  if (staffLoaded) return;
+  staffLoaded = true;
+  db.collection(STAFF_COL).onSnapshot(snap => {
+    staffMembers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const eo = (e) => (e.order !== undefined && e.order !== null) ? e.order : 9999;
+    staffMembers.sort((a,b) => eo(a) - eo(b));
+    renderStaffTab();
+  }, err => { console.error(err); toast("⚠️ 従業員の読み込みエラー"); });
+}
+function renderStaffTab() {
+  const wrap = document.getElementById("staffListWrap");
+  if (!staffMembers.length) { wrap.innerHTML = '<div class="empty">従業員がまだ登録されていません</div>'; return; }
+  wrap.innerHTML = staffMembers.map((e, i) => `
+    <div class="v-card">
+      <div class="v-info">
+        <div class="v-number">${i + 1}. ${esc(e.name || "")}</div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button onclick="moveStaffMember('${e.id}',-1)" style="border:none;background:#f1f5f9;color:#334155;border-radius:8px;padding:8px 12px;">▲</button>
+        <button onclick="moveStaffMember('${e.id}',1)" style="border:none;background:#f1f5f9;color:#334155;border-radius:8px;padding:8px 12px;">▼</button>
+        <button onclick="renameStaffMember('${e.id}')" style="border:none;background:#e0f2fe;color:#0369a1;border-radius:8px;padding:8px 12px;">✏️</button>
+        <button onclick="deleteStaffMember('${e.id}')" style="border:none;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:8px 12px;">🗑</button>
+      </div>
+    </div>`).join("");
+}
+async function addStaffMember() {
+  const name = document.getElementById("addStaffName").value.trim();
+  if (!name) { toast("従業員名を入力してください"); return; }
+  if (staffMembers.some(e => e.name === name)) { toast("⚠️ 同じ名前がすでに登録されています"); return; }
+  const maxOrder = staffMembers.reduce((m, e) => Math.max(m, (e.order ?? 0)), 0);
+  try {
+    await db.collection(STAFF_COL).add({ name, qualifications: [], order: maxOrder + 1 });
+    document.getElementById("addStaffName").value = "";
+    toast("✅ 追加しました");
+  } catch(e) { toast("⚠️ 追加に失敗しました"); }
+}
+window.moveStaffMember = async function(id, dir) {
+  const idx = staffMembers.findIndex(e => e.id === id);
+  const j = idx + dir;
+  if (idx < 0 || j < 0 || j >= staffMembers.length) return;
+  const arr = staffMembers.slice();
+  const t = arr[idx]; arr[idx] = arr[j]; arr[j] = t;
+  try {
+    const batch = db.batch();
+    arr.forEach((e, i2) => batch.update(db.collection(STAFF_COL).doc(e.id), { order: i2 + 1 }));
+    await batch.commit();
+  } catch(e) { toast("⚠️ 並べ替えに失敗しました"); }
+};
+window.renameStaffMember = async function(id) {
+  const e = staffMembers.find(x => x.id === id);
+  if (!e) return;
+  const n = prompt("新しい名前", e.name || "");
+  if (!n || !n.trim() || n.trim() === e.name) return;
+  try {
+    await db.collection(STAFF_COL).doc(id).update({ name: n.trim() });
+    toast("✅ 変更しました");
+  } catch(err) { toast("⚠️ 変更に失敗しました"); }
+};
+window.deleteStaffMember = async function(id) {
+  const e = staffMembers.find(x => x.id === id);
+  if (!e) return;
+  if (!confirm("「" + (e.name||"") + "」を削除しますか？\n\n⚠️ 業務管理に登録された資格情報も一緒に消えます。退職などで本当に不要な場合だけ削除してください。")) return;
+  try {
+    await db.collection(STAFF_COL).doc(id).delete();
+    toast("🗑 削除しました");
+  } catch(err) { toast("⚠️ 削除に失敗しました"); }
+};
 
 /* ---------- 取引先マスタ ---------- */
 const CLIENT_COL = "master_clients";
