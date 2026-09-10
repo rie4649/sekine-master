@@ -122,6 +122,9 @@
     <input type="text" id="addModel" placeholder="車種(例:大型ダンプ)">
   </div>
   <div class="row">
+    <input type="text" id="addNickname" placeholder="呼び名(点検ラクラクの表示名 例:340・アームロール)">
+  </div>
+  <div class="row">
     <input type="date" id="addShaken">
   </div>
   <button class="btn btn-main" onclick="addVehicle()">登録</button>
@@ -264,6 +267,7 @@
     <h3>✏️ 車両を編集</h3>
     <div class="field"><label>車番</label><input type="text" id="editNumber"></div>
     <div class="field"><label>車種</label><input type="text" id="editModel"></div>
+    <div class="field"><label>呼び名(点検ラクラク表示名)</label><input type="text" id="editNickname"></div>
     <div class="field"><label>車検満了日</label><input type="date" id="editShaken"></div>
     <div class="modal-btns">
       <button class="btn btn-sub" onclick="closeEdit()">キャンセル</button>
@@ -340,7 +344,7 @@ function shakenBadge(dateStr) {
 function render() {
   const q = (document.getElementById("searchBox").value || "").trim();
   let list = vehicles.slice();
-  if (q) list = list.filter(v => (v.number||"").includes(q) || (v.model||"").includes(q));
+  if (q) list = list.filter(v => (v.number||"").includes(q) || (v.model||"").includes(q) || (v.nickname||"").includes(q));
 
   if (sortMode === "shaken") {
     list.sort((a,b) => (a.shakenDate || "9999-99-99").localeCompare(b.shakenDate || "9999-99-99"));
@@ -359,7 +363,7 @@ function render() {
       return `
       <div class="v-card">
         <div class="v-info">
-          <div class="v-number">${esc(v.number)}</div>
+          <div class="v-number">${esc(v.number)}${v.nickname ? '　<span style="color:#0d9488;font-size:13px;">「' + esc(v.nickname) + '」</span>' : ""}</div>
           <div class="v-model">${esc(v.model || "")}</div>
         </div>
         <div class="v-shaken">
@@ -383,16 +387,18 @@ function esc(s){ return (s||"").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 async function addVehicle() {
   const number = document.getElementById("addNumber").value.trim();
   const model  = document.getElementById("addModel").value.trim();
+  const nickname = document.getElementById("addNickname").value.trim();
   const shaken = document.getElementById("addShaken").value;
   if (!number) { toast("車番を入力してください"); return; }
   if (vehicles.some(v => v.number === number)) { toast("⚠️ 同じ車番がすでに登録されています"); return; }
   try {
     await db.collection(COL).add({
-      number, model, shakenDate: shaken || "",
+      number, model, nickname, shakenDate: shaken || "",
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     document.getElementById("addNumber").value = "";
+    document.getElementById("addNickname").value = "";
     document.getElementById("addModel").value = "";
     document.getElementById("addShaken").value = "";
     toast("✅ 登録しました");
@@ -446,6 +452,7 @@ function openEdit(id) {
   editingId = id;
   document.getElementById("editNumber").value = v.number || "";
   document.getElementById("editModel").value = v.model || "";
+  document.getElementById("editNickname").value = v.nickname || "";
   document.getElementById("editShaken").value = v.shakenDate || "";
   document.getElementById("editModalBg").classList.add("show");
 }
@@ -462,6 +469,7 @@ async function saveEdit() {
     await db.collection(COL).doc(editingId).update({
       number,
       model: document.getElementById("editModel").value.trim(),
+      nickname: document.getElementById("editNickname").value.trim(),
       shakenDate: document.getElementById("editShaken").value || "",
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
