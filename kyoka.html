@@ -46,12 +46,17 @@
   <label>どの許可証？(業務管理の許可証リストから選択)</label>
   <select id="docPermit" onchange="document.getElementById('docTypeFree').style.display = this.value==='__free__' ? 'block' : 'none'"></select>
   <input type="text" id="docTypeFree" placeholder="許可証の名前を入力" style="display:none;margin-top:6px;">
-  <label>交付日(書類の日付)</label>
+  <label>日付の種類</label>
+  <div style="display:flex;gap:8px;">
+    <label style="flex:1;display:flex;align-items:center;gap:6px;font-weight:bold;border:1px solid #d4d4d8;border-radius:10px;padding:10px;margin:0;"><input type="radio" name="dateKind" value="許可期限" checked style="width:auto;">許可期限</label>
+    <label style="flex:1;display:flex;align-items:center;gap:6px;font-weight:bold;border:1px solid #d4d4d8;border-radius:10px;padding:10px;margin:0;"><input type="radio" name="dateKind" value="交付日" style="width:auto;">交付日</label>
+  </div>
+  <label>日付</label>
   <input type="date" id="docDate">
   <label>ファイル(PDFまたは写真)</label>
   <input type="file" id="docFile" accept="application/pdf,image/*" multiple>
   <button class="upBtn" id="upBtn" onclick="uploadDoc()">📤 アップして保管する</button>
-  <div class="note">ファイルは複数まとめて選べます(一括アップ)。複数のときは名前がいったんファイル名で入るので、あとから各カードの✏️で名前と交付日を直してください。更新のたびにアップすれば古い許可証も履歴として残ります。許可期限の管理は今まで通り業務管理で。</div>
+  <div class="note">ファイルは複数まとめて選べます(一括アップ)。複数のときは名前がいったんファイル名で入るので、あとから各カードの✏️で名前と許可期限を直してください。更新のたびにアップすれば古い許可証も履歴として残ります。許可期限の管理は今まで通り業務管理で。</div>
 </div>
 
 <div id="docList"><div class="empty">読み込み中...</div></div>
@@ -59,11 +64,16 @@
 
 <div id="editModalBg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;padding:16px;" onclick="if(event.target===this)closeEditDoc()">
   <div style="background:#fff;border-radius:14px;padding:16px;max-width:480px;margin:60px auto;">
-    <h2 style="font-size:16px;margin-bottom:4px;">✏️ 名前と交付日を編集</h2>
+    <h2 style="font-size:16px;margin-bottom:4px;">✏️ 名前と日付を編集</h2>
     <input type="hidden" id="editDocId">
     <label>名前(どの許可証か)</label>
     <input type="text" id="editDocType">
-    <label>交付日</label>
+    <label>日付の種類</label>
+    <div style="display:flex;gap:8px;">
+      <label style="flex:1;display:flex;align-items:center;gap:6px;font-weight:bold;border:1px solid #d4d4d8;border-radius:10px;padding:10px;margin:0;"><input type="radio" name="editDateKind" value="許可期限" style="width:auto;">許可期限</label>
+      <label style="flex:1;display:flex;align-items:center;gap:6px;font-weight:bold;border:1px solid #d4d4d8;border-radius:10px;padding:10px;margin:0;"><input type="radio" name="editDateKind" value="交付日" style="width:auto;">交付日</label>
+    </div>
+    <label>日付</label>
     <input type="date" id="editDocDate">
     <div style="display:flex;gap:8px;margin-top:14px;">
       <button style="flex:1;padding:12px;border:none;border-radius:10px;background:#e4e4e7;color:#3f3f46;font-size:15px;font-weight:bold;" onclick="closeEditDoc()">キャンセル</button>
@@ -111,7 +121,7 @@ function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.
 function esc(t){ return String(t??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function fmtSize(b){ if(!b) return ""; if(b<1024*1024) return Math.round(b/1024)+"KB"; return (b/1024/1024).toFixed(1)+"MB"; }
 function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
-document.getElementById("docDate").value = todayStr();
+
 
 db.collection(DOC_COL).onSnapshot(snap=>{
   docs = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -133,7 +143,7 @@ function renderDocs(){
     ${byLabel[y].map(d=>`
       <div class="card">
         <div class="info">
-          <div class="ttl">📄 交付日 ${esc(d.date||"")}</div>
+          <div class="ttl">📄 ${esc(d.dateKind||"許可期限")} ${esc(d.date||"")}</div>
           <div class="sub">${esc(d.fileName||"")} ・ ${fmtSize(d.size)}</div>
         </div>
         <button class="openBtn" onclick="openDoc('${d.id}')">開く</button>
@@ -152,7 +162,7 @@ function blobToBase64(blob){
   });
 }
 
-async function uploadOne(file, type, date, btn, prefix){
+async function uploadOne(file, type, date, dateKind, btn, prefix){
   const b64 = await blobToBase64(file);
   const chunks = [];
   for(let i=0; i<b64.length; i+=CHUNK_SIZE) chunks.push(b64.slice(i, i+CHUNK_SIZE));
@@ -162,7 +172,7 @@ async function uploadOne(file, type, date, btn, prefix){
     btn.textContent = `${prefix} ${i+1}/${chunks.length}`;
   }
   await docRef.set({
-    type, date,
+    type, date, dateKind,
     fileName: file.name,
     fileType: file.type || "application/pdf",
     size: file.size,
@@ -174,7 +184,8 @@ async function uploadDoc(){
   const files = Array.from(document.getElementById("docFile").files||[]);
   const date = document.getElementById("docDate").value;
   if(!files.length){ toast("ファイルを選んでください"); return; }
-  if(!date){ toast("交付日を入れてください"); return; }
+  if(!date){ toast("日付を入れてください"); return; }
+  const dateKind = document.querySelector('input[name=dateKind]:checked').value;
   const over = files.find(f=>f.size > MAX_MB*1024*1024);
   if(over){ toast(`⚠️ ${over.name} が${MAX_MB}MBを超えています`); return; }
   let type = document.getElementById("docPermit").value;
@@ -187,7 +198,7 @@ async function uploadDoc(){
     for(let f=0; f<files.length; f++){
       const file = files[f];
       const t = files.length===1 ? type : file.name.replace(/\.[^.]+$/, "");
-      await uploadOne(file, t, date, btn, files.length>1 ? `アップ中 ${f+1}/${files.length}件目…` : "アップ中…");
+      await uploadOne(file, t, date, dateKind, btn, files.length>1 ? `アップ中 ${f+1}/${files.length}件目…` : "アップ中…");
       ok++;
     }
     document.getElementById("docFile").value = "";
@@ -219,6 +230,7 @@ window.editDoc = function(id){
   document.getElementById("editDocId").value = id;
   document.getElementById("editDocType").value = d.type||"";
   document.getElementById("editDocDate").value = d.date||"";
+  document.querySelector('input[name=editDateKind][value="'+(d.dateKind||"許可期限")+'"]').checked = true;
   document.getElementById("editModalBg").style.display = "block";
 };
 window.closeEditDoc = function(){ document.getElementById("editModalBg").style.display = "none"; };
@@ -227,9 +239,10 @@ window.saveEditDoc = async function(){
   const type = document.getElementById("editDocType").value.trim();
   const date = document.getElementById("editDocDate").value;
   if(!type){ toast("名前を入力してください"); return; }
-  if(!date){ toast("交付日を入れてください"); return; }
+  if(!date){ toast("日付を入れてください"); return; }
+  const dateKind = document.querySelector('input[name=editDateKind]:checked').value;
   try{
-    await db.collection(DOC_COL).doc(id).update({ type, date });
+    await db.collection(DOC_COL).doc(id).update({ type, date, dateKind });
     closeEditDoc(); toast("✅ 変更しました");
   }catch(e){ toast("❌ 変更に失敗: "+e.message); }
 };
