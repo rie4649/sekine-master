@@ -126,6 +126,24 @@
   <div class="row">
     <input type="text" id="addNickname" placeholder="呼び名(点検ラクラクの表示名 例:340・アームロール)">
   </div>
+  <div class="row" style="display:flex;gap:8px;">
+    <input type="month" id="addFirstReg" title="初年度登録" style="flex:1;">
+    <input type="text" id="addKatashiki" placeholder="型式(例:2PG-FEB90)" style="flex:1;">
+  </div>
+  <div class="row" style="display:flex;gap:8px;">
+    <select id="addBodyShape" style="flex:1;"><option value="">車体の形状</option></select>
+    <input type="text" id="addHaikiryo" placeholder="総排気量/定格出力(例:2.99)" style="flex:1;">
+  </div>
+  <div class="row" style="display:flex;gap:8px;">
+    <input type="text" id="addMaxLoad" placeholder="最大積載量kg" inputmode="numeric" style="flex:1;">
+    <input type="text" id="addWeight" placeholder="車両重量kg" inputmode="numeric" style="flex:1;">
+    <input type="text" id="addTotalWeight" placeholder="車両総重量kg" inputmode="numeric" style="flex:1;">
+  </div>
+  <div class="row" style="display:flex;gap:8px;">
+    <select id="addInsurer" style="flex:1;"><option value="">保険会社</option></select>
+    <input type="text" id="addInsurerMemo" placeholder="保険メモ(担当者など)" style="flex:1;">
+  </div>
+  <div class="row" style="font-size:11px;color:#94a3b8;">※初年度登録(左上)は年月、形状・保険会社の選択肢は業務管理のマスタと共通です</div>
   <div class="row">
     <input type="date" id="addShaken">
   </div>
@@ -282,6 +300,15 @@
     <div class="field"><label>車番</label><input type="text" id="editNumber"></div>
     <div class="field"><label>車種</label><input type="text" id="editModel"></div>
     <div class="field"><label>呼び名(点検ラクラク表示名)</label><input type="text" id="editNickname"></div>
+    <div class="field"><label>初年度登録</label><input type="month" id="editFirstReg"></div>
+    <div class="field"><label>型式</label><input type="text" id="editKatashiki"></div>
+    <div class="field"><label>車体の形状</label><select id="editBodyShape"><option value="">未選択</option></select></div>
+    <div class="field"><label>総排気量/定格出力</label><input type="text" id="editHaikiryo"></div>
+    <div class="field"><label>最大積載量(kg)</label><input type="text" id="editMaxLoad" inputmode="numeric"></div>
+    <div class="field"><label>車両重量(kg)</label><input type="text" id="editWeight" inputmode="numeric"></div>
+    <div class="field"><label>車両総重量(kg)</label><input type="text" id="editTotalWeight" inputmode="numeric"></div>
+    <div class="field"><label>保険会社</label><select id="editInsurer"><option value="">未選択</option></select></div>
+    <div class="field"><label>保険メモ(担当者など)</label><input type="text" id="editInsurerMemo"></div>
     <div class="field"><label>車検満了日</label><input type="date" id="editShaken"></div>
     <div class="modal-btns">
       <button class="btn btn-sub" onclick="closeEdit()">キャンセル</button>
@@ -322,6 +349,32 @@ firebase.initializeApp({
 });
 const db = firebase.firestore();
 const COL = "master_vehicles";
+let bodyShapeList = [];
+let insurerList = [];
+function fillShapeInsurerSelects(){
+  [["addBodyShape","車体の形状"],["editBodyShape","未選択"]].forEach(([id,ph])=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    const cur = el.value;
+    el.innerHTML = `<option value="">${ph}</option>` + bodyShapeList.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
+    if(cur) el.value = cur;
+  });
+  [["addInsurer","保険会社"],["editInsurer","未選択"]].forEach(([id,ph])=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    const cur = el.value;
+    el.innerHTML = `<option value="">${ph}</option>` + insurerList.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
+    if(cur) el.value = cur;
+  });
+}
+db.collection("bodyShapes").onSnapshot(snap=>{
+  bodyShapeList = snap.docs.map(d=>d.data().name).filter(Boolean);
+  fillShapeInsurerSelects();
+}, err=>console.error(err));
+db.collection("insuranceCompanies").onSnapshot(snap=>{
+  insurerList = snap.docs.map(d=>d.data().name).filter(Boolean);
+  fillShapeInsurerSelects();
+}, err=>console.error(err));
 
 let vehicles = [];
 let sortMode = "shaken";
@@ -378,7 +431,9 @@ function render() {
       <div class="v-card">
         <div class="v-info">
           <div class="v-number">${esc(v.number)}${v.nickname ? '　<span style="color:#0d9488;font-size:13px;">「' + esc(v.nickname) + '」</span>' : ""}</div>
-          <div class="v-model">${esc(v.model || "")}</div>
+          <div class="v-model">${esc(v.model || "")}${v.katashiki?`　型式 ${esc(v.katashiki)}`:""}${v.bodyShape?`　${esc(v.bodyShape)}`:""}</div>
+          ${(v.firstReg||v.haikiryo||v.maxLoad||v.totalWeight)?`<div class="v-model" style="font-size:12px;color:#94a3b8;">${v.firstReg?`初年度 ${esc(v.firstReg)}　`:""}${v.haikiryo?`排気量 ${esc(v.haikiryo)}　`:""}${v.maxLoad?`積載 ${esc(v.maxLoad)}kg　`:""}${v.weight?`重量 ${esc(v.weight)}kg　`:""}${v.totalWeight?`総重量 ${esc(v.totalWeight)}kg`:""}</div>`:""}
+          ${(v.insurer||v.insurerMemo)?`<div class="v-model" style="font-size:12px;color:#0d9488;">🛡 ${esc(v.insurer||"")}${v.insurerMemo?`　${esc(v.insurerMemo)}`:""}</div>`:""}
         </div>
         <div class="v-shaken">
           ${shakenBadge(v.shakenDate)}
@@ -402,17 +457,31 @@ async function addVehicle() {
   const number = document.getElementById("addNumber").value.trim();
   const model  = document.getElementById("addModel").value.trim();
   const nickname = document.getElementById("addNickname").value.trim();
+  const extra = {
+    firstReg: document.getElementById("addFirstReg").value,
+    katashiki: document.getElementById("addKatashiki").value.trim(),
+    bodyShape: document.getElementById("addBodyShape").value,
+    haikiryo: document.getElementById("addHaikiryo").value.trim(),
+    maxLoad: document.getElementById("addMaxLoad").value.trim(),
+    weight: document.getElementById("addWeight").value.trim(),
+    totalWeight: document.getElementById("addTotalWeight").value.trim(),
+    insurer: document.getElementById("addInsurer").value,
+    insurerMemo: document.getElementById("addInsurerMemo").value.trim()
+  };
   const shaken = document.getElementById("addShaken").value;
   if (!number) { toast("車番を入力してください"); return; }
   if (vehicles.some(v => v.number === number)) { toast("⚠️ 同じ車番がすでに登録されています"); return; }
   try {
     await db.collection(COL).add({
-      number, model, nickname, shakenDate: shaken || "",
+      number, model, nickname, ...extra, shakenDate: shaken || "",
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     document.getElementById("addNumber").value = "";
     document.getElementById("addNickname").value = "";
+    ["addFirstReg","addKatashiki","addHaikiryo","addMaxLoad","addWeight","addTotalWeight","addInsurerMemo"].forEach(id=>document.getElementById(id).value="");
+    document.getElementById("addBodyShape").value = "";
+    document.getElementById("addInsurer").value = "";
     document.getElementById("addModel").value = "";
     document.getElementById("addShaken").value = "";
     toast("✅ 登録しました");
@@ -467,6 +536,15 @@ function openEdit(id) {
   document.getElementById("editNumber").value = v.number || "";
   document.getElementById("editModel").value = v.model || "";
   document.getElementById("editNickname").value = v.nickname || "";
+  document.getElementById("editFirstReg").value = v.firstReg || "";
+  document.getElementById("editKatashiki").value = v.katashiki || "";
+  document.getElementById("editBodyShape").value = v.bodyShape || "";
+  document.getElementById("editHaikiryo").value = v.haikiryo || "";
+  document.getElementById("editMaxLoad").value = v.maxLoad || "";
+  document.getElementById("editWeight").value = v.weight || "";
+  document.getElementById("editTotalWeight").value = v.totalWeight || "";
+  document.getElementById("editInsurer").value = v.insurer || "";
+  document.getElementById("editInsurerMemo").value = v.insurerMemo || "";
   document.getElementById("editShaken").value = v.shakenDate || "";
   document.getElementById("editModalBg").classList.add("show");
 }
@@ -484,6 +562,15 @@ async function saveEdit() {
       number,
       model: document.getElementById("editModel").value.trim(),
       nickname: document.getElementById("editNickname").value.trim(),
+      firstReg: document.getElementById("editFirstReg").value,
+      katashiki: document.getElementById("editKatashiki").value.trim(),
+      bodyShape: document.getElementById("editBodyShape").value,
+      haikiryo: document.getElementById("editHaikiryo").value.trim(),
+      maxLoad: document.getElementById("editMaxLoad").value.trim(),
+      weight: document.getElementById("editWeight").value.trim(),
+      totalWeight: document.getElementById("editTotalWeight").value.trim(),
+      insurer: document.getElementById("editInsurer").value,
+      insurerMemo: document.getElementById("editInsurerMemo").value.trim(),
       shakenDate: document.getElementById("editShaken").value || "",
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
