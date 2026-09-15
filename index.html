@@ -121,7 +121,7 @@
     <input type="text" id="addNumber" placeholder="車番(例:上田100あ1234)">
   </div>
   <div class="row">
-    <input type="text" id="addModel" placeholder="車種(例:大型ダンプ)">
+    <select id="addModel"><option value="">車種(車体の形状から選択)</option></select>
   </div>
   <div class="row">
     <input type="text" id="addNickname" placeholder="呼び名(点検ラクラクの表示名 例:340・アームロール)">
@@ -132,10 +132,7 @@
   </div>
   <div class="row" style="display:flex;gap:8px;">
     <select id="addMaker" style="flex:1;"><option value="">メーカー</option></select>
-    <select id="addBodyShape" style="flex:1;"><option value="">車体の形状</option></select>
-  </div>
-  <div class="row">
-    <input type="text" id="addHaikiryo" placeholder="総排気量/定格出力(例:2.99)">
+    <input type="text" id="addHaikiryo" placeholder="総排気量/定格出力(例:2.99)" style="flex:1;">
   </div>
   <div class="row" style="display:flex;gap:8px;">
     <input type="text" id="addMaxLoad" placeholder="最大積載量kg" inputmode="numeric" style="flex:1;">
@@ -146,12 +143,20 @@
     <select id="addInsurer" style="flex:1;"><option value="">保険会社</option></select>
     <input type="text" id="addInsurerMemo" placeholder="保険メモ(担当者など)" style="flex:1;">
   </div>
-  <div class="row" style="font-size:11px;color:#94a3b8;">※初年度登録(左上)は年月、形状・保険会社の選択肢は業務管理のマスタと共通です</div>
+  <div class="row" style="font-size:11px;color:#94a3b8;">※車種・メーカー・保険会社の選択肢は、すぐ下の「⚙️車両の選択肢マスタ」で増やせます</div>
   <div class="row">
     <input type="date" id="addShaken">
   </div>
   <button class="btn btn-main" onclick="addVehicle()">登録</button>
   <div class="hint">車検満了日は空欄でも登録できます(あとから編集可)</div>
+</div>
+
+<div class="section" style="margin-top:4px;">
+  <details>
+    <summary style="font-size:15px;font-weight:bold;color:#0d9488;padding:6px 0;cursor:pointer;">⚙️ 車両の選択肢マスタ(メーカー・車体の形状・保険会社)</summary>
+    <div style="font-size:12px;color:#64748b;margin-top:4px;">ここで編集した選択肢は、マスタ管理と業務管理の両方で使われます(編集はここだけ)</div>
+    <div id="optionMaster"></div>
+  </details>
 </div>
 
 <!-- 一括登録 -->
@@ -179,13 +184,6 @@
 <!-- 車両一覧 -->
 <div id="vehicleList"></div>
 
-<div class="section" style="margin-top:4px;">
-  <details>
-    <summary style="font-size:15px;font-weight:bold;color:#0d9488;padding:6px 0;cursor:pointer;">⚙️ 車両の選択肢マスタ(メーカー・車体の形状・保険会社)</summary>
-    <div style="font-size:12px;color:#64748b;margin-top:4px;">ここで編集した選択肢は、マスタ管理と業務管理の両方で使われます(編集はここだけ)</div>
-    <div id="optionMaster"></div>
-  </details>
-</div>
 </div><!-- /tabVehicles -->
 
 <!-- ============ 取引先タブ ============ -->
@@ -308,12 +306,11 @@
   <div class="modal">
     <h3>✏️ 車両を編集</h3>
     <div class="field"><label>車番</label><input type="text" id="editNumber"></div>
-    <div class="field"><label>車種</label><input type="text" id="editModel"></div>
+    <div class="field"><label>車種(車体の形状から選択)</label><select id="editModel"><option value="">未選択</option></select></div>
     <div class="field"><label>呼び名(点検ラクラク表示名)</label><input type="text" id="editNickname"></div>
     <div class="field"><label>初年度登録</label><input type="month" id="editFirstReg"></div>
     <div class="field"><label>型式</label><input type="text" id="editKatashiki"></div>
     <div class="field"><label>メーカー</label><select id="editMaker"><option value="">未選択</option></select></div>
-    <div class="field"><label>車体の形状</label><select id="editBodyShape"><option value="">未選択</option></select></div>
     <div class="field"><label>総排気量/定格出力</label><input type="text" id="editHaikiryo"></div>
     <div class="field"><label>最大積載量(kg)</label><input type="text" id="editMaxLoad" inputmode="numeric"></div>
     <div class="field"><label>車両重量(kg)</label><input type="text" id="editWeight" inputmode="numeric"></div>
@@ -369,7 +366,7 @@ function fillOptionSelects(){
     el.innerHTML = `<option value="">${ph}</option>` + docs.map(d=>`<option value="${esc(d.name)}">${esc(d.name)}</option>`).join("");
     if(cur) el.value = cur;
   });
-  fill([["addBodyShape","車体の形状"],["editBodyShape","未選択"]], bodyShapeDocs);
+  fill([["addModel","車種(車体の形状から選択)"],["editModel","未選択"]], bodyShapeDocs);
   fill([["addInsurer","保険会社"],["editInsurer","未選択"]], insurerDocs);
   fill([["addMaker","メーカー"],["editMaker","未選択"]], makerDocs);
   renderOptionMaster();
@@ -499,7 +496,7 @@ function render() {
       <div class="v-card">
         <div class="v-info">
           <div class="v-number">${esc(v.number)}${v.nickname ? '　<span style="color:#0d9488;font-size:13px;">「' + esc(v.nickname) + '」</span>' : ""}</div>
-          <div class="v-model">${v.maker?`${esc(v.maker)}　`:""}${esc(v.model || "")}${v.katashiki?`　型式 ${esc(v.katashiki)}`:""}${v.bodyShape?`　${esc(v.bodyShape)}`:""}</div>
+          <div class="v-model">${v.maker?`${esc(v.maker)}　`:""}${esc(v.model || "")}${v.katashiki?`　型式 ${esc(v.katashiki)}`:""}</div>
           ${(v.firstReg||v.haikiryo||v.maxLoad||v.totalWeight)?`<div class="v-model" style="font-size:12px;color:#94a3b8;">${v.firstReg?`初年度 ${esc(v.firstReg)}　`:""}${v.haikiryo?`排気量 ${esc(v.haikiryo)}　`:""}${v.maxLoad?`積載 ${esc(v.maxLoad)}kg　`:""}${v.weight?`重量 ${esc(v.weight)}kg　`:""}${v.totalWeight?`総重量 ${esc(v.totalWeight)}kg`:""}</div>`:""}
           ${(v.insurer||v.insurerMemo)?`<div class="v-model" style="font-size:12px;color:#0d9488;">🛡 ${esc(v.insurer||"")}${v.insurerMemo?`　${esc(v.insurerMemo)}`:""}</div>`:""}
         </div>
@@ -529,7 +526,6 @@ async function addVehicle() {
     maker: document.getElementById("addMaker").value,
     firstReg: document.getElementById("addFirstReg").value,
     katashiki: document.getElementById("addKatashiki").value.trim(),
-    bodyShape: document.getElementById("addBodyShape").value,
     haikiryo: document.getElementById("addHaikiryo").value.trim(),
     maxLoad: document.getElementById("addMaxLoad").value.trim(),
     weight: document.getElementById("addWeight").value.trim(),
@@ -549,7 +545,6 @@ async function addVehicle() {
     document.getElementById("addNumber").value = "";
     document.getElementById("addNickname").value = "";
     ["addFirstReg","addKatashiki","addHaikiryo","addMaxLoad","addWeight","addTotalWeight","addInsurerMemo"].forEach(id=>document.getElementById(id).value="");
-    document.getElementById("addBodyShape").value = "";
     document.getElementById("addMaker").value = "";
     document.getElementById("addInsurer").value = "";
     document.getElementById("addModel").value = "";
@@ -609,7 +604,6 @@ function openEdit(id) {
   document.getElementById("editMaker").value = v.maker || "";
   document.getElementById("editFirstReg").value = v.firstReg || "";
   document.getElementById("editKatashiki").value = v.katashiki || "";
-  document.getElementById("editBodyShape").value = v.bodyShape || "";
   document.getElementById("editHaikiryo").value = v.haikiryo || "";
   document.getElementById("editMaxLoad").value = v.maxLoad || "";
   document.getElementById("editWeight").value = v.weight || "";
@@ -636,7 +630,6 @@ async function saveEdit() {
       maker: document.getElementById("editMaker").value,
       firstReg: document.getElementById("editFirstReg").value,
       katashiki: document.getElementById("editKatashiki").value.trim(),
-      bodyShape: document.getElementById("editBodyShape").value,
       haikiryo: document.getElementById("editHaikiryo").value.trim(),
       maxLoad: document.getElementById("editMaxLoad").value.trim(),
       weight: document.getElementById("editWeight").value.trim(),
