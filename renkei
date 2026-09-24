@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1e293b">
+<title>連動一覧表</title>
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif; background:#f1f5f9; color:#1e293b; padding-bottom:90px; }
+  header { background:linear-gradient(135deg,#1e293b,#334155); color:#fff; padding:16px; position:sticky; top:0; z-index:50; }
+  header h1 { font-size:20px; display:flex; align-items:center; gap:8px; }
+  header .sub { font-size:11px; opacity:.7; margin-top:2px; letter-spacing:1px; }
+  .back-btn { position:absolute; top:14px; right:14px; padding:8px 12px; border:none; border-radius:10px; background:rgba(255,255,255,.15); color:#fff; font-size:13px; font-weight:700; }
+
+  .top-btns { display:flex; gap:8px; margin:12px 12px 0; }
+  .mode-btn { flex:1; padding:11px; border:none; border-radius:12px; background:#fff; color:#0d9488; font-size:14px; font-weight:700; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .mode-btn.on { background:#0d9488; color:#fff; }
+
+  .section { background:#fff; margin:12px 12px; border-radius:16px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .section h2 { font-size:15px; margin-bottom:4px; display:flex; align-items:center; gap:6px; }
+  .sec-note { font-size:12px; color:#64748b; margin-bottom:12px; line-height:1.5; }
+
+  /* マスター参照 */
+  .hub { text-align:center; margin-bottom:4px; }
+  .hub .hub-name { display:inline-block; font-size:16px; font-weight:700; background:linear-gradient(transparent 55%, #fde68a 55%, #fde68a 92%, transparent 92%); padding:2px 12px; }
+  .hub .hub-sub { font-size:11px; color:#64748b; }
+  .trunk { width:2px; height:14px; background:#cbd5e1; margin:4px auto 10px; }
+  .master-card { border:1.5px solid #cbd5e1; border-radius:12px; padding:10px 12px; margin-bottom:10px; }
+  .master-head { display:flex; align-items:center; gap:8px; }
+  .master-name { font-size:14.5px; font-weight:700; }
+  .master-sub { font-size:11px; color:#64748b; }
+  .app-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .app-chip { background:#f0fdfa; border:1px solid #99f6e4; color:#0f766e; border-radius:999px; padding:3px 11px; font-size:12.5px; font-weight:600; }
+
+  /* 連動の行 */
+  .link-card { border:1.5px solid #e2e8f0; border-radius:12px; padding:10px 12px; margin-bottom:8px; }
+  .link-line { display:flex; align-items:center; flex-wrap:wrap; gap:5px 7px; font-size:14px; }
+  .l-app { font-weight:700; background:linear-gradient(transparent 58%, #fde68a 58%, #fde68a 94%, transparent 94%); padding:0 2px; }
+  .l-sub { font-size:12.5px; color:#475569; font-weight:600; }
+  .l-arrow { color:#94a3b8; font-weight:700; }
+  .l-target { font-weight:600; }
+  .l-target small { color:#64748b; font-weight:400; }
+  .tag { font-size:11px; font-weight:700; border-radius:999px; padding:1px 9px; }
+  .tag.auto { background:#dcfce7; color:#15803d; }
+  .tag.web { background:#dbeafe; color:#1d4ed8; }
+  .tag.other { background:#fef3c7; color:#b45309; }
+  .l-note { font-size:12px; color:#64748b; margin-top:4px; }
+
+  /* 単独 */
+  .alone-chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .alone-chip { border:1.5px solid #cbd5e1; background:#fff; border-radius:999px; padding:6px 14px; font-size:13.5px; font-weight:600; }
+  .alone-chip small { color:#64748b; font-weight:400; }
+  .alone-wrap { display:flex; align-items:center; gap:6px; }
+
+  /* 編集モードの部品 */
+  .edit-btns { display:flex; gap:6px; margin-top:8px; }
+  .edit-btns.inline { margin-top:0; margin-left:auto; }
+  .mini-btn { border:none; border-radius:9px; background:#f1f5f9; color:#334155; font-size:14px; padding:8px 11px; font-weight:700; }
+  .mini-btn:active { opacity:.7; }
+  .add-btn { display:block; width:100%; padding:11px; border:2px dashed #99f6e4; border-radius:12px; background:#f0fdfa; color:#0f766e; font-size:14px; font-weight:700; margin-top:4px; }
+  .hidden { display:none !important; }
+
+  .btn { display:block; width:100%; padding:13px; border:none; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; }
+  .btn-main { background:#0d9488; color:#fff; }
+  .btn-sub { background:#e2e8f0; color:#334155; }
+  .btn-danger { background:#fee2e2; color:#dc2626; }
+  .btn:active { opacity:.8; }
+
+  input[type=text], textarea, select {
+    width:100%; padding:11px 12px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:16px; background:#fff; font-family:inherit;
+  }
+  input:focus, textarea:focus, select:focus { outline:none; border-color:#0d9488; }
+  textarea { min-height:90px; }
+
+  /* モーダル */
+  .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:100; align-items:flex-end; }
+  .modal-bg.show { display:flex; }
+  .modal { background:#fff; width:100%; border-radius:20px 20px 0 0; padding:20px 16px 30px; max-height:85vh; overflow-y:auto; }
+  .modal h3 { font-size:16px; margin-bottom:14px; }
+  .modal .field { margin-bottom:12px; }
+  .modal .field label { font-size:12px; color:#64748b; display:block; margin-bottom:4px; font-weight:600; }
+  .modal-btns { display:flex; gap:8px; margin-top:16px; }
+
+  #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:#1e293b; color:#fff; padding:12px 22px; border-radius:999px; font-size:14px; opacity:0; pointer-events:none; transition:.25s; z-index:200; white-space:nowrap; }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .updated { text-align:center; font-size:11px; color:#94a3b8; margin:4px 0 20px; }
+
+  @media print {
+    body { background:#fff; padding-bottom:0; }
+    header { position:static; }
+    .back-btn, .top-btns, .edit-btns, .add-btn, .modal-bg, #toast { display:none !important; }
+    .section { box-shadow:none; border:1px solid #cbd5e1; page-break-inside:avoid; }
+  }
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<header>
+  <h1>🔗 連動一覧表</h1>
+  <div class="sub">SEKINE MASTER</div>
+  <button class="back-btn" onclick="location.href='index.html'">🗂 マスタ管理へ</button>
+</header>
+
+<div class="top-btns">
+  <button class="mode-btn" id="editModeBtn" onclick="toggleEdit()">✏️ 編集モード</button>
+  <button class="mode-btn" onclick="window.print()">🖨️ 印刷</button>
+</div>
+
+<!-- 1. マスター参照 -->
+<div class="section">
+  <h2>1️⃣ マスター管理からの参照</h2>
+  <div class="sec-note">マスタ管理に登録したデータを、下の各アプリが読み込んで使う。</div>
+  <div class="hub">
+    <span class="hub-name">マスター管理</span>
+    <div class="hub-sub">共通マスタ管理アプリ</div>
+  </div>
+  <div class="trunk"></div>
+  <div id="masterList"></div>
+  <button class="add-btn edit-only hidden" onclick="openMasterModal(-1)">＋ マスタを追加</button>
+</div>
+
+<!-- 2. 外部サイト連動 -->
+<div class="section">
+  <h2>2️⃣ 外部サイトとの連動</h2>
+  <div class="sec-note">「自動」はアプリが自動取得、「web」はリンクで開く方式。</div>
+  <div id="externalList"></div>
+  <button class="add-btn edit-only hidden" onclick="openLinkModal('external',-1)">＋ 外部連動を追加</button>
+</div>
+
+<!-- 3. アプリ間の連動 -->
+<div class="section">
+  <h2>3️⃣ アプリ間の連動</h2>
+  <div class="sec-note">社内アプリどうしでデータがつながっているもの。</div>
+  <div id="applinkList"></div>
+  <button class="add-btn edit-only hidden" onclick="openLinkModal('applinks',-1)">＋ アプリ間連動を追加</button>
+</div>
+
+<!-- 4. 単独アプリ -->
+<div class="section">
+  <h2>4️⃣ 単独アプリ</h2>
+  <div class="sec-note">他の社内アプリとはデータ連動しないもの。</div>
+  <div class="alone-chips" id="aloneList"></div>
+  <button class="add-btn edit-only hidden" onclick="openAloneModal(-1)">＋ 単独アプリを追加</button>
+</div>
+
+<div class="updated" id="updatedAt"></div>
+
+<!-- マスタ編集モーダル -->
+<div class="modal-bg" id="masterModalBg">
+  <div class="modal">
+    <h3 id="masterModalTitle">マスタを編集</h3>
+    <div class="field"><label>マスタ名（例：車両）</label><input type="text" id="mName"></div>
+    <div class="field"><label>補足（例：車両マスタ）</label><input type="text" id="mSub"></div>
+    <div class="field"><label>参照しているアプリ（1行に1つ）</label><textarea id="mApps" placeholder="点検ラクラク&#10;タイヤ管理"></textarea></div>
+    <div class="modal-btns">
+      <button class="btn btn-sub" onclick="closeModals()">キャンセル</button>
+      <button class="btn btn-main" onclick="saveMaster()">保存</button>
+    </div>
+    <div class="modal-btns hidden" id="masterDelWrap">
+      <button class="btn btn-danger" onclick="deleteMaster()">🗑 このマスタを削除</button>
+    </div>
+  </div>
+</div>
+
+<!-- 連動の行 編集モーダル -->
+<div class="modal-bg" id="linkModalBg">
+  <div class="modal">
+    <h3 id="linkModalTitle">連動を編集</h3>
+    <div class="field"><label>アプリ名（左側）</label><input type="text" id="lApp" placeholder="単価管理"></div>
+    <div class="field"><label>機能名など補足（なければ空欄）</label><input type="text" id="lSub" placeholder="月次カレンダー"></div>
+    <div class="field"><label>矢印</label>
+      <select id="lArrow">
+        <option value="←">←（相手から受け取る）</option>
+        <option value="→">→（相手へ渡す・開く）</option>
+        <option value="⇔">⇔（おたがいに連動）</option>
+      </select>
+    </div>
+    <div class="field"><label>種類タグ</label>
+      <select id="lTag">
+        <option value="自動">自動（自動取得）</option>
+        <option value="web">web（リンクで開く）</option>
+        <option value="連動">連動</option>
+        <option value="巡回表示">巡回表示</option>
+        <option value="">タグなし</option>
+      </select>
+    </div>
+    <div class="field"><label>相手（サイト名・アプリ名）</label><input type="text" id="lTarget" placeholder="鐘栄商店"></div>
+    <div class="field"><label>相手の補足（カッコ内に表示）</label><input type="text" id="lTargetSub" placeholder="銅建値・黄銅ダライ粉価格"></div>
+    <div class="field"><label>備考（※の行）</label><input type="text" id="lNote" placeholder="※千曲通信 ＝ 東京製鐵 田原・新断 ＋2円"></div>
+    <div class="modal-btns">
+      <button class="btn btn-sub" onclick="closeModals()">キャンセル</button>
+      <button class="btn btn-main" onclick="saveLink()">保存</button>
+    </div>
+    <div class="modal-btns hidden" id="linkDelWrap">
+      <button class="btn btn-danger" onclick="deleteLink()">🗑 この連動を削除</button>
+    </div>
+  </div>
+</div>
+
+<!-- 単独アプリ 編集モーダル -->
+<div class="modal-bg" id="aloneModalBg">
+  <div class="modal">
+    <h3 id="aloneModalTitle">単独アプリを編集</h3>
+    <div class="field"><label>アプリ名</label><input type="text" id="aName"></div>
+    <div class="field"><label>補足（なければ空欄）</label><input type="text" id="aNote" placeholder="社内では単独・相場サイトのみ連動"></div>
+    <div class="modal-btns">
+      <button class="btn btn-sub" onclick="closeModals()">キャンセル</button>
+      <button class="btn btn-main" onclick="saveAlone()">保存</button>
+    </div>
+    <div class="modal-btns hidden" id="aloneDelWrap">
+      <button class="btn btn-danger" onclick="deleteAlone()">🗑 削除</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyD99Mx0MnGpLSQjV7830bS7-gdCBSM9DGY",
+  authDomain: "sekine-store.firebaseapp.com",
+  projectId: "sekine-store",
+  appId: "1:781856496751:web:e2e1e5de4cd803415a819a"
+});
+const db = firebase.firestore();
+const DOC = db.collection("renkeiMap").doc("main");
+
+/* ---------- 初期データ（初回だけ自動登録） ---------- */
+const SEED = {
+  masters: [
+    { name:"車両", sub:"車両マスタ", apps:["点検ラクラク","タイヤ管理","機械作業","業務管理","ISO管理"] },
+    { name:"従業員", sub:"従業員マスタ", apps:["点検ラクラク","配車ボード","業務管理","引取先管理"] },
+    { name:"取引先", sub:"取引先マスタ", apps:["点検ラクラク","配車ボード","引取先管理"] },
+    { name:"許可証PDF", sub:"許可証の保管", apps:["ISO管理（許可一覧）"] }
+  ],
+  external: [
+    { app:"単価管理", sub:"", arrow:"←", tag:"自動", target:"鐘栄商店", targetSub:"銅建値・黄銅ダライ粉価格", note:"※花村産業BS粉 ＝ 黄銅ダライ粉 −70円で自動計算" },
+    { app:"単価管理", sub:"", arrow:"←", tag:"自動", target:"東京製鐵", targetSub:"国内鉄スクラップ購入価格表", note:"※千曲通信 ＝ 東京製鐵 田原・新断 ＋2円" },
+    { app:"ISO管理", sub:"法規制一覧", arrow:"←", tag:"自動", target:"e-Gov", targetSub:"法令情報を自動取得", note:"" },
+    { app:"ISO管理", sub:"", arrow:"→", tag:"web", target:"SDGsポータル", targetSub:"NAGANO SDGs BUSINESS PORTAL", note:"" },
+    { app:"ISO管理", sub:"", arrow:"→", tag:"web", target:"さんぱいくん", targetSub:"産廃情報ネット", note:"" }
+  ],
+  applinks: [
+    { app:"ISO管理", sub:"月次カレンダー", arrow:"⇔", tag:"連動", target:"社内掲示板", targetSub:"", note:"" },
+    { app:"ISO管理", sub:"環境手順書", arrow:"→", tag:"連動", target:"点検ラクラク", targetSub:"QRページから閲覧", note:"" },
+    { app:"機械作業", sub:"", arrow:"⇔", tag:"連動", target:"配車ボード", targetSub:"", note:"" },
+    { app:"マスター管理", sub:"スクリーンセイバー", arrow:"→", tag:"巡回表示", target:"電話依頼・社内掲示板", targetSub:"", note:"" }
+  ],
+  standalone: [
+    { name:"取引確認書", note:"" },
+    { name:"単価管理", note:"社内では単独・相場サイトのみ連動" },
+    { name:"電話依頼", note:"" },
+    { name:"外注スケジュール", note:"" },
+    { name:"無事故無違反", note:"" }
+  ]
+};
+
+let state = null;
+let editMode = false;
+let editTarget = { kind:"", section:"", index:-1 };
+
+/* ---------- 読み込み ---------- */
+async function load() {
+  try {
+    const snap = await DOC.get();
+    if (snap.exists) {
+      state = snap.data();
+    } else {
+      state = JSON.parse(JSON.stringify(SEED));
+      await DOC.set({ ...state, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      toast("初期データを登録しました");
+    }
+  } catch (e) {
+    console.error(e);
+    state = JSON.parse(JSON.stringify(SEED));
+    toast("読み込みに失敗（オフライン表示）");
+  }
+  renderAll();
+}
+
+/* ---------- 保存 ---------- */
+async function saveAll(msg) {
+  try {
+    await DOC.set({ ...state, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    toast(msg || "保存しました");
+  } catch (e) {
+    console.error(e);
+    toast("⚠️ 保存に失敗しました");
+  }
+  renderAll();
+}
+
+/* ---------- 表示 ---------- */
+function esc(s){ return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function tagClass(t){ return t==="自動" ? "auto" : t==="web" ? "web" : "other"; }
+
+function moveBtns(section, i, len){
+  if (!editMode) return "";
+  return `<div class="edit-btns">
+    <button class="mini-btn" onclick="moveItem('${section}',${i},-1)" ${i===0?"disabled":""}>▲</button>
+    <button class="mini-btn" onclick="moveItem('${section}',${i},1)" ${i===len-1?"disabled":""}>▼</button>
+    <button class="mini-btn" onclick="${section==='masters' ? `openMasterModal(${i})` : section==='standalone' ? `openAloneModal(${i})` : `openLinkModal('${section}',${i})`}">✏️</button>
+  </div>`;
+}
+
+function renderAll(){
+  /* マスター */
+  const ml = document.getElementById("masterList");
+  ml.innerHTML = (state.masters||[]).map((m,i)=>`
+    <div class="master-card">
+      <div class="master-head">
+        <span class="master-name">${esc(m.name)}</span>
+        <span class="master-sub">${esc(m.sub)}</span>
+      </div>
+      <div class="app-chips">${(m.apps||[]).map(a=>`<span class="app-chip">${esc(a)}</span>`).join("")}</div>
+      ${moveBtns("masters", i, state.masters.length)}
+    </div>`).join("");
+
+  /* 外部・アプリ間 */
+  ["external","applinks"].forEach(sec=>{
+    const el = document.getElementById(sec==="external" ? "externalList" : "applinkList");
+    el.innerHTML = (state[sec]||[]).map((r,i)=>`
+      <div class="link-card">
+        <div class="link-line">
+          <span class="l-app">${esc(r.app)}</span>
+          ${r.sub ? `<span class="l-sub">${esc(r.sub)}</span>` : ""}
+          <span class="l-arrow">${esc(r.arrow)}</span>
+          ${r.tag ? `<span class="tag ${tagClass(r.tag)}">${esc(r.tag)}</span>` : ""}
+          <span class="l-target">${esc(r.target)}${r.targetSub ? ` <small>（${esc(r.targetSub)}）</small>` : ""}</span>
+        </div>
+        ${r.note ? `<div class="l-note">${esc(r.note)}</div>` : ""}
+        ${moveBtns(sec, i, state[sec].length)}
+      </div>`).join("");
+  });
+
+  /* 単独 */
+  const al = document.getElementById("aloneList");
+  al.innerHTML = (state.standalone||[]).map((a,i)=>`
+    <div class="alone-wrap">
+      <span class="alone-chip">${esc(a.name)}${a.note ? ` <small>（${esc(a.note)}）</small>` : ""}</span>
+      ${editMode ? `<div class="edit-btns inline">
+        <button class="mini-btn" onclick="moveItem('standalone',${i},-1)" ${i===0?"disabled":""}>▲</button>
+        <button class="mini-btn" onclick="moveItem('standalone',${i},1)" ${i===state.standalone.length-1?"disabled":""}>▼</button>
+        <button class="mini-btn" onclick="openAloneModal(${i})">✏️</button>
+      </div>` : ""}
+    </div>`).join("");
+  al.style.flexDirection = editMode ? "column" : "row";
+  al.style.alignItems = editMode ? "flex-start" : "center";
+
+  /* 更新日時 */
+  const u = state.updatedAt;
+  if (u && u.toDate) {
+    const d = u.toDate();
+    document.getElementById("updatedAt").textContent =
+      `最終更新：${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,"0")}`;
+  }
+
+  document.querySelectorAll(".edit-only").forEach(el=>el.classList.toggle("hidden", !editMode));
+}
+
+/* ---------- 編集モード ---------- */
+function toggleEdit(){
+  editMode = !editMode;
+  document.getElementById("editModeBtn").classList.toggle("on", editMode);
+  document.getElementById("editModeBtn").textContent = editMode ? "✅ 編集を終わる" : "✏️ 編集モード";
+  renderAll();
+}
+
+function moveItem(section, i, dir){
+  const arr = state[section];
+  const j = i + dir;
+  if (j < 0 || j >= arr.length) return;
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+  saveAll("並び順を保存しました");
+}
+
+/* ---------- マスタ編集 ---------- */
+function openMasterModal(i){
+  editTarget = { kind:"master", section:"masters", index:i };
+  const m = i >= 0 ? state.masters[i] : { name:"", sub:"", apps:[] };
+  document.getElementById("masterModalTitle").textContent = i >= 0 ? "マスタを編集" : "マスタを追加";
+  document.getElementById("mName").value = m.name || "";
+  document.getElementById("mSub").value = m.sub || "";
+  document.getElementById("mApps").value = (m.apps||[]).join("\n");
+  document.getElementById("masterDelWrap").classList.toggle("hidden", i < 0);
+  document.getElementById("masterModalBg").classList.add("show");
+}
+function saveMaster(){
+  const name = document.getElementById("mName").value.trim();
+  if (!name) { toast("マスタ名を入れてください"); return; }
+  const m = {
+    name,
+    sub: document.getElementById("mSub").value.trim(),
+    apps: document.getElementById("mApps").value.split("\n").map(s=>s.trim()).filter(Boolean)
+  };
+  if (editTarget.index >= 0) state.masters[editTarget.index] = m;
+  else state.masters.push(m);
+  closeModals(); saveAll();
+}
+function deleteMaster(){
+  if (!confirm("このマスタを一覧から削除しますか？")) return;
+  state.masters.splice(editTarget.index, 1);
+  closeModals(); saveAll("削除しました");
+}
+
+/* ---------- 連動の行 編集 ---------- */
+function openLinkModal(section, i){
+  editTarget = { kind:"link", section, index:i };
+  const r = i >= 0 ? state[section][i] : { app:"", sub:"", arrow: section==="external" ? "←" : "⇔", tag: section==="external" ? "自動" : "連動", target:"", targetSub:"", note:"" };
+  document.getElementById("linkModalTitle").textContent =
+    (section==="external" ? "外部サイトとの連動" : "アプリ間の連動") + (i >= 0 ? "を編集" : "を追加");
+  document.getElementById("lApp").value = r.app || "";
+  document.getElementById("lSub").value = r.sub || "";
+  document.getElementById("lArrow").value = r.arrow || "⇔";
+  document.getElementById("lTag").value = r.tag ?? "";
+  document.getElementById("lTarget").value = r.target || "";
+  document.getElementById("lTargetSub").value = r.targetSub || "";
+  document.getElementById("lNote").value = r.note || "";
+  document.getElementById("linkDelWrap").classList.toggle("hidden", i < 0);
+  document.getElementById("linkModalBg").classList.add("show");
+}
+function saveLink(){
+  const app = document.getElementById("lApp").value.trim();
+  const target = document.getElementById("lTarget").value.trim();
+  if (!app || !target) { toast("アプリ名と相手を入れてください"); return; }
+  const r = {
+    app,
+    sub: document.getElementById("lSub").value.trim(),
+    arrow: document.getElementById("lArrow").value,
+    tag: document.getElementById("lTag").value,
+    target,
+    targetSub: document.getElementById("lTargetSub").value.trim(),
+    note: document.getElementById("lNote").value.trim()
+  };
+  const { section, index } = editTarget;
+  if (index >= 0) state[section][index] = r;
+  else state[section].push(r);
+  closeModals(); saveAll();
+}
+function deleteLink(){
+  if (!confirm("この連動を一覧から削除しますか？")) return;
+  state[editTarget.section].splice(editTarget.index, 1);
+  closeModals(); saveAll("削除しました");
+}
+
+/* ---------- 単独アプリ 編集 ---------- */
+function openAloneModal(i){
+  editTarget = { kind:"alone", section:"standalone", index:i };
+  const a = i >= 0 ? state.standalone[i] : { name:"", note:"" };
+  document.getElementById("aloneModalTitle").textContent = i >= 0 ? "単独アプリを編集" : "単独アプリを追加";
+  document.getElementById("aName").value = a.name || "";
+  document.getElementById("aNote").value = a.note || "";
+  document.getElementById("aloneDelWrap").classList.toggle("hidden", i < 0);
+  document.getElementById("aloneModalBg").classList.add("show");
+}
+function saveAlone(){
+  const name = document.getElementById("aName").value.trim();
+  if (!name) { toast("アプリ名を入れてください"); return; }
+  const a = { name, note: document.getElementById("aNote").value.trim() };
+  if (editTarget.index >= 0) state.standalone[editTarget.index] = a;
+  else state.standalone.push(a);
+  closeModals(); saveAll();
+}
+function deleteAlone(){
+  if (!confirm("この単独アプリを一覧から削除しますか？")) return;
+  state.standalone.splice(editTarget.index, 1);
+  closeModals(); saveAll("削除しました");
+}
+
+/* ---------- 共通 ---------- */
+function closeModals(){
+  document.querySelectorAll(".modal-bg").forEach(m=>m.classList.remove("show"));
+}
+document.querySelectorAll(".modal-bg").forEach(bg=>{
+  bg.addEventListener("click", e => { if (e.target === bg) closeModals(); });
+});
+let toastTimer = null;
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove("show"), 2200);
+}
+
+load();
+</script>
+</body>
+</html>
