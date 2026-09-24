@@ -119,13 +119,14 @@
 <div class="section">
   <h2>➕ 車両を登録</h2>
   <div class="row">
-    <input type="text" id="addNumber" placeholder="車番(例:上田100あ1234)">
+    <input type="text" id="addNickname" placeholder="愛称【メイン】(各アプリの表示名 例:340・低クレ)">
   </div>
+  <div class="row">
+    <input type="text" id="addNumber" placeholder="車番(例:長野100す8618)">
+  </div>
+  <div class="row" style="font-size:11px;color:#94a3b8;margin-top:-4px;">※愛称か車番のどちらかは必ず入れてください(両方あるのがおすすめ)</div>
   <div class="row">
     <select id="addModel"><option value="">車種(車体の形状から選択)</option></select>
-  </div>
-  <div class="row">
-    <input type="text" id="addNickname" placeholder="呼び名(点検ラクラクの表示名 例:340・アームロール)">
   </div>
   <div class="row" style="display:flex;gap:8px;">
     <input type="month" id="addFirstReg" title="初年度登録" style="flex:1;">
@@ -185,11 +186,11 @@
 
 <!-- 検索・並び替え -->
 <div class="search-bar">
-  <input type="text" id="searchBox" placeholder="🔍 車番・車種で検索" oninput="render()">
+  <input type="text" id="searchBox" placeholder="🔍 愛称・車番・車種で検索" oninput="render()">
 </div>
 <div class="sort-row">
   <button class="sort-btn active" id="sortShaken" onclick="setSort('shaken')">車検が近い順</button>
-  <button class="sort-btn" id="sortNumber" onclick="setSort('number')">車番順</button>
+  <button class="sort-btn" id="sortNumber" onclick="setSort('number')">愛称順</button>
 </div>
 
 <!-- 車両一覧 -->
@@ -316,9 +317,9 @@
 <div class="modal-bg" id="editModalBg" onclick="if(event.target===this)closeEdit()">
   <div class="modal">
     <h3>✏️ 車両を編集</h3>
-    <div class="field"><label>車番</label><input type="text" id="editNumber"></div>
+    <div class="field"><label>愛称【メイン】(各アプリの表示名)</label><input type="text" id="editNickname"></div>
+    <div class="field"><label>車番</label><input type="text" id="editNumber" placeholder="例:長野100す8618"></div>
     <div class="field"><label>車種(車体の形状から選択)</label><select id="editModel"><option value="">未選択</option></select></div>
-    <div class="field"><label>呼び名(点検ラクラク表示名)</label><input type="text" id="editNickname"></div>
     <div class="field"><label>初年度登録</label><input type="month" id="editFirstReg"></div>
     <div class="field"><label>型式</label><input type="text" id="editKatashiki"></div>
     <div class="field"><label>メーカー</label><select id="editMaker"><option value="">未選択</option></select></div>
@@ -496,6 +497,13 @@ function shakenBadge(dateStr) {
   if (days <= 60) return `<span class="badge soon">${label}</span>`;
   return `<span class="badge ok">${label}</span>`;
 }
+// 愛称がメイン。車番は愛称と違うときだけ下に表示
+function vMainName(v){ return (v.nickname || "").trim() || (v.number || "").trim() || "名称未設定"; }
+function vPlateOnly(v){
+  const n = (v.number || "").trim();
+  return (n && vkey(n) !== vkey(vMainName(v))) ? n : "";
+}
+function vkey(s){ return (s||"").toString().normalize("NFKC").replace(/[\s\u3000]/g,"").toLowerCase(); }
 function render() {
   const q = (document.getElementById("searchBox").value || "").trim();
   let list = vehicles.slice();
@@ -504,7 +512,7 @@ function render() {
   if (sortMode === "shaken") {
     list.sort((a,b) => (a.shakenDate || "9999-99-99").localeCompare(b.shakenDate || "9999-99-99"));
   } else {
-    list.sort((a,b) => (a.number||"").localeCompare(b.number||"", "ja"));
+    list.sort((a,b) => vMainName(a).localeCompare(vMainName(b), "ja"));
   }
 
   const wrap = document.getElementById("vehicleList");
@@ -518,7 +526,8 @@ function render() {
       return `
       <div class="v-card">
         <div class="v-info">
-          <div class="v-number">${esc(v.number)}${v.nickname ? '　<span style="color:#0d9488;font-size:13px;">「' + esc(v.nickname) + '」</span>' : ""}</div>
+          <div class="v-number">${esc(vMainName(v))}</div>
+          <div class="v-model" style="font-weight:600;color:#334155;">🚘 ${vPlateOnly(v) ? esc(vPlateOnly(v)) : '<span style="color:#cbd5e1;font-weight:400;">車番未登録</span>'}</div>
           <div class="v-model">${v.maker?`${esc(v.maker)}　`:""}${esc(v.model || "")}${v.katashiki?`　型式 ${esc(v.katashiki)}`:""}</div>
           ${(v.firstReg||v.haikiryo||v.maxLoad||v.totalWeight)?`<div class="v-model" style="font-size:12px;color:#94a3b8;">${v.firstReg?`初年度 ${esc(v.firstReg)}　`:""}${v.haikiryo?`排気量 ${esc(v.haikiryo)}　`:""}${v.maxLoad?`積載 ${esc(v.maxLoad)}kg　`:""}${v.weight?`重量 ${esc(v.weight)}kg　`:""}${v.totalWeight?`総重量 ${esc(v.totalWeight)}kg`:""}</div>`:""}
           ${(v.insurer||v.insurerMemo)?`<div class="v-model" style="font-size:12px;color:#0d9488;">🛡 ${esc(v.insurer||"")}${v.insurerMemo?`　${esc(v.insurerMemo)}`:""}</div>`:""}
@@ -540,6 +549,14 @@ function render() {
 }
 function esc(s){ return (s||"").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
+/* ---------- 重複チェック(愛称・車番) ---------- */
+function vehicleDupMessage(nickname, number, selfId){
+  const others = vehicles.filter(v => v.id !== selfId);
+  if (number && others.some(v => vkey(v.number) === vkey(number))) return "⚠️ 同じ車番がすでに登録されています";
+  if (nickname && others.some(v => vkey(v.nickname) === vkey(nickname) || (!v.nickname && vkey(v.number) === vkey(nickname)))) return "⚠️ 同じ愛称がすでに登録されています";
+  return "";
+}
+
 /* ---------- 登録 ---------- */
 async function addVehicle() {
   const number = document.getElementById("addNumber").value.trim();
@@ -557,8 +574,8 @@ async function addVehicle() {
     insurerMemo: document.getElementById("addInsurerMemo").value.trim()
   };
   const shaken = document.getElementById("addShaken").value;
-  if (!number) { toast("車番を入力してください"); return; }
-  if (vehicles.some(v => v.number === number)) { toast("⚠️ 同じ車番がすでに登録されています"); return; }
+  if (!number && !nickname) { toast("愛称か車番を入力してください"); return; }
+  { const dm = vehicleDupMessage(nickname, number, null); if (dm) { toast(dm); return; } }
   try {
     await db.collection(COL).add({
       number, model, nickname, ...extra, shakenDate: shaken || "",
@@ -643,8 +660,9 @@ function closeEdit() {
 async function saveEdit() {
   if (!editingId) return;
   const number = document.getElementById("editNumber").value.trim();
-  if (!number) { toast("車番を入力してください"); return; }
-  if (vehicles.some(v => v.number === number && v.id !== editingId)) { toast("⚠️ 同じ車番が他にあります"); return; }
+  const nickForCheck = document.getElementById("editNickname").value.trim();
+  if (!number && !nickForCheck) { toast("愛称か車番を入力してください"); return; }
+  { const dm = vehicleDupMessage(nickForCheck, number, editingId); if (dm) { toast(dm); return; } }
   try {
     await db.collection(COL).doc(editingId).update({
       number,
@@ -669,7 +687,7 @@ async function saveEdit() {
 async function deleteVehicle() {
   if (!editingId) return;
   const v = vehicles.find(x => x.id === editingId);
-  if (!confirm(`「${v ? v.number : ""}」を削除しますか?\nこの操作は元に戻せません。`)) return;
+  if (!confirm(`「${v ? vMainName(v) : ""}」を削除しますか?\nこの操作は元に戻せません。`)) return;
   try {
     await db.collection(COL).doc(editingId).delete();
     closeEdit();
@@ -1445,15 +1463,20 @@ async function openLedgerImport(){
     body.innerHTML = "⚠️ 業務管理の台帳を読み込めませんでした(通信を確認してください)";
     return;
   }
-  const masterByKey = {};
-  vehicles.forEach(mv => { if (mv.number) masterByKey[ledgerKey(mv.number)] = mv; });
+  const byNumber = {}, byNick = {};
+  vehicles.forEach(mv => {
+    if (mv.number) byNumber[ledgerKey(mv.number)] = mv;
+    if (mv.nickname) byNick[ledgerKey(mv.nickname)] = mv;
+  });
+  const findMaster = (v) => {
+    const p = ledgerKey(v.plateNumber), n = ledgerKey(v.nickname);
+    return (p && byNumber[p]) || (n && byNumber[n]) || (n && byNick[n]) || (p && byNick[p]) || null;
+  };
 
-  const plan = { updates:{}, fills:[], conflicts:[], news:[], skipped:[] };
+  const plan = { updates:{}, fills:[], conflicts:[], news:[], skipped:[], plateFixes:[] };
   const usedMaster = new Set();
   ledger.forEach(v => {
-    let mv = null;
-    if (v.plateNumber) mv = masterByKey[ledgerKey(v.plateNumber)];
-    if (!mv && v.nickname) mv = masterByKey[ledgerKey(v.nickname)];
+    const mv = findMaster(v);
     if (!mv) {
       const number = (v.plateNumber || "").trim();
       if (!number) { plan.skipped.push(v); return; }
@@ -1466,15 +1489,29 @@ async function openLedgerImport(){
     }
     if (usedMaster.has(mv.id)) return; // 同じ車両が台帳に2件ある場合は1件目だけ
     usedMaster.add(mv.id);
-    const name = (mv.nickname ? mv.nickname + " / " : "") + mv.number;
+    const name = vMainName(mv) + (vPlateOnly(mv) ? " / " + vPlateOnly(mv) : "");
+    // 車番:マスタの車番欄に愛称が入っている／空 → 台帳の本当の車番に直す
+    let plateFixed = false;
+    const lp = (v.plateNumber || "").trim();
+    if (lp && ledgerKey(lp) !== ledgerKey(mv.number)) {
+      const takenByOther = vehicles.some(o => o.id !== mv.id && ledgerKey(o.number) === ledgerKey(lp));
+      const numIsName = !mv.number || ledgerKey(mv.number) === ledgerKey(mv.nickname) || ledgerKey(mv.number) === ledgerKey(v.nickname);
+      if (!takenByOther && numIsName) {
+        plan.plateFixes.push({ id:mv.id, name: vMainName(mv), from: mv.number || "(空)", to: lp, keepNick: mv.nickname ? "" : (mv.number || "") });
+        plateFixed = true;
+      } else if (!takenByOther) {
+        plan.conflicts.push({ id:mv.id, lid:v.id, name, f:{ m:"number", l:"plateNumber", label:"車番" }, master:String(mv.number), ledger:lp });
+      }
+    }
     LEDGER_FIELDS.forEach(f => {
       const lv = ledgerVal(f, v);
+      if (plateFixed && f.m === "nickname") return; // 愛称は元の名前を残す
       const cur = mv[f.m];
       if (isBlank(lv)) return;
       if (isBlank(cur)) {
         plan.fills.push({ id:mv.id, name, f, val:lv });
       } else if (f.conflict && normCmp(cur, f.num) !== normCmp(lv, f.num)) {
-        plan.conflicts.push({ id:mv.id, name, f, master:String(cur), ledger:lv });
+        plan.conflicts.push({ id:mv.id, lid:v.id, name, f, master:String(cur), ledger:lv });
       }
     });
   });
@@ -1484,7 +1521,7 @@ async function openLedgerImport(){
 
 function renderImportPlan(){
   const p = importPlan, body = document.getElementById("importBody");
-  if (!p.fills.length && !p.conflicts.length && !p.news.length) {
+  if (!p.fills.length && !p.conflicts.length && !p.news.length && !p.plateFixes.length) {
     body.innerHTML = `<div style="padding:16px;text-align:center;color:#0f766e;font-weight:bold;">✅ 食い違いはありません<br><span style="font-weight:normal;font-size:13px;color:#64748b;">台帳とマスタの車両情報はそろっています</span></div>`;
     document.getElementById("importRunBtn").style.display = "none";
     return;
@@ -1493,7 +1530,16 @@ function renderImportPlan(){
     <span class="badge" style="background:#fef3c7;color:#92400e;">⚠️ 食い違い ${p.conflicts.length}件</span>
     <span class="badge" style="background:#dcfce7;color:#166534;">✏️ 空欄を埋める ${p.fills.length}件</span>
     <span class="badge" style="background:#dbeafe;color:#1e40af;">➕ マスタに新規登録 ${p.news.length}台</span>
+    <span class="badge" style="background:#ede9fe;color:#5b21b6;">🚘 車番を直す ${p.plateFixes.length}台</span>
   </div>`;
+
+  if (p.plateFixes.length) {
+    h += `<div style="font-weight:bold;margin:8px 0 4px;">🚘 車番の欄に愛称が入っている車両(台帳の車番に直します)</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:6px;">愛称はそのまま残ります。違うものはチェックを外してください。</div>`;
+    p.plateFixes.forEach((x, i) => {
+      h += `<label style="display:flex;align-items:center;gap:6px;padding:4px 0;"><input type="checkbox" id="pf${i}" checked> <b>${esc(x.name)}</b>:${esc(x.from)} → <b>${esc(x.to)}</b></label>`;
+    });
+  }
 
   if (p.conflicts.length) {
     h += `<div style="font-weight:bold;margin:8px 0 4px;">⚠️ 食い違い(残す方を選んでください)</div>
@@ -1547,14 +1593,28 @@ async function runLedgerImport(){
   const updates = {};
   const add = (id, k, v) => { (updates[id] = updates[id] || {})[k] = v; };
   p.fills.forEach(fl => add(fl.id, fl.f.m, fl.val));
+  p.plateFixes.forEach((x, i) => {
+    const cb = document.getElementById("pf" + i);
+    if (!cb || !cb.checked) return;
+    add(x.id, "number", x.to);
+    if (x.keepNick) add(x.id, "nickname", x.keepNick);
+  });
+  // 「マスタ」を選んだ項目は、台帳側もマスタの値にそろえる(次回また食い違いとして出ないように)
+  const ledgerUpdates = {};
   p.conflicts.forEach((c, i) => {
     const r = document.querySelector(`input[name="cf${i}"]:checked`);
     if (r && r.value === "ledger") add(c.id, c.f.m, c.ledger);
+    else if (c.lid) {
+      let val = c.master;
+      if (c.f.num) { const n = Number(String(val).normalize("NFKC").replace(/[,\s]/g,"")); val = isNaN(n) ? val : n; }
+      (ledgerUpdates[c.lid] = ledgerUpdates[c.lid] || {})[c.f.l] = val;
+    }
   });
   const newList = p.news.filter((n, i) => { const cb = document.getElementById("nw" + i); return cb && cb.checked; });
   const nUpd = Object.keys(updates).length;
-  if (!nUpd && !newList.length) { toast("変更はありません"); closeLedgerImport(); return; }
-  if (!confirm(`マスタの車両 ${nUpd}台を更新、${newList.length}台を新規登録します。よろしいですか?`)) return;
+  const nLed = Object.keys(ledgerUpdates).length;
+  if (!nUpd && !newList.length && !nLed) { toast("変更はありません"); closeLedgerImport(); return; }
+  if (!confirm(`マスタの車両 ${nUpd}台を更新、${newList.length}台を新規登録${nLed ? `、業務管理の台帳 ${nLed}台をマスタの値にそろえ` : ""}ます。よろしいですか?`)) return;
   const btn = document.getElementById("importRunBtn");
   btn.disabled = true; btn.textContent = "取り込み中…";
   try {
@@ -1562,6 +1622,7 @@ async function runLedgerImport(){
     const batch = db.batch();
     Object.entries(updates).forEach(([id, data]) => batch.update(db.collection(COL).doc(id), { ...data, updatedAt: ts }));
     newList.forEach(n => batch.set(db.collection(COL).doc(), { ...n.data, createdAt: ts, updatedAt: ts }));
+    Object.entries(ledgerUpdates).forEach(([lid, data]) => batch.update(db.collection(LEDGER_COL).doc(lid), { ...data, updatedAt: ts }));
     await batch.commit();
     toast("✅ 取り込みました");
     // 取り込み後にもう一度見くらべて結果を表示
