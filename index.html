@@ -160,6 +160,16 @@
   </details>
 </div>
 
+<!-- 業務管理の台帳から取り込み -->
+<div class="section" style="margin-top:4px;">
+  <h2 style="margin-bottom:6px;">📥 業務管理の台帳から取り込む</h2>
+  <div style="font-size:12px;color:#64748b;line-height:1.6;margin-bottom:10px;">
+    業務管理の車両台帳の詳しい情報(初年度登録・型式・メーカー・排気量・重量・保険会社・車種)を、車番で照合してこのマスタへ取り込みます。<br>
+    空いている項目は自動で埋め、<b>両方に値があって違う項目</b>はどちらを残すか選べます。何度開いても安全です(そろっていれば「食い違いなし」と出ます)。
+  </div>
+  <button class="btn btn-main" onclick="openLedgerImport()">📥 台帳と見くらべる</button>
+</div>
+
 <!-- 一括登録 -->
 <div class="section">
   <div class="toggle-head" id="bulkHead" onclick="toggleBulk()">
@@ -324,6 +334,18 @@
       <button class="btn btn-main" onclick="saveEdit()">保存</button>
     </div>
     <button class="btn btn-danger" style="margin-top:10px" onclick="deleteVehicle()">🗑 この車両を削除</button>
+  </div>
+</div>
+
+<!-- 台帳取り込みモーダル -->
+<div class="modal-bg" id="importModalBg" onclick="if(event.target===this)closeLedgerImport()">
+  <div class="modal">
+    <h3>📥 業務管理の台帳と見くらべ</h3>
+    <div id="importBody" style="font-size:14px;">読み込み中…</div>
+    <div class="modal-btns">
+      <button class="btn btn-sub" onclick="closeLedgerImport()">閉じる</button>
+      <button class="btn btn-main" id="importRunBtn" onclick="runLedgerImport()" style="display:none;">この内容で取り込む</button>
+    </div>
   </div>
 </div>
 
@@ -1370,6 +1392,191 @@ window.deleteContract = async function(id){
   toast("削除しました");
 };
 window.addContractManually = function(){ openContractEdit(null); };
+
+
+/* ---------- 業務管理の台帳(vehicleLedger)から取り込み ---------- */
+const LEDGER_COL = "vehicleLedger";
+// マスタ項目 ⇔ 台帳項目 の対応(conflict:true は食い違いを選ばせる項目)
+const LEDGER_FIELDS = [
+  { m:"maker",       l:"companyName",      label:"メーカー",           conflict:true },
+  { m:"model",       l:"bodyShape",        label:"車種(車体の形状)",   conflict:true },
+  { m:"firstReg",    l:"registeredDate",   label:"初年度登録",         conflict:true },
+  { m:"katashiki",   l:"modelType",        label:"型式",               conflict:true },
+  { m:"haikiryo",    l:"engineOutput",     label:"総排気量/定格出力",  conflict:true },
+  { m:"maxLoad",     l:"maxLoad",          label:"最大積載量(kg)",     conflict:true, num:true },
+  { m:"weight",      l:"vehicleWeight",    label:"車両重量(kg)",       conflict:true, num:true },
+  { m:"totalWeight", l:"grossWeight",      label:"車両総重量(kg)",     conflict:true, num:true },
+  { m:"insurer",     l:"insuranceCompany", label:"保険会社",           conflict:true },
+  // 以下は「マスタが空のときだけ埋める」(マスタ側が正なので食い違いは出さない)
+  { m:"nickname",    l:"nickname",         label:"呼び名",             conflict:false },
+  { m:"shakenDate",  l:"shakenDate",       label:"車検満了日",         conflict:false }
+];
+let importPlan = null;
+
+function ledgerKey(s){ return (s||"").toString().normalize("NFKC").replace(/[\s　]/g,"").toLowerCase(); }
+function isBlank(x){ return x===undefined || x===null || String(x).trim()===""; }
+function normCmp(x, num){
+  if (isBlank(x)) return "";
+  let t = String(x).normalize("NFKC").replace(/[\s　,]/g,"").toLowerCase();
+  if (num) { t = t.replace(/kg$/,""); const n = Number(t); if (!isNaN(n)) return String(n); }
+  return t;
+}
+function ledgerVal(f, v){
+  let x = v[f.l];
+  if (isBlank(x)) return "";
+  if (f.m === "nickname") {
+    // 旧データで愛称欄に車番が入っているものは呼び名にしない
+    if (ledgerKey(x) === ledgerKey(v.plateNumber)) return "";
+  }
+  return String(x).trim();
+}
+
+async function openLedgerImport(){
+  document.getElementById("importModalBg").classList.add("show");
+  document.getElementById("importRunBtn").style.display = "none";
+  const body = document.getElementById("importBody");
+  body.innerHTML = "読み込み中…";
+  let ledger;
+  try {
+    const snap = await db.collection(LEDGER_COL).get();
+    ledger = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  } catch(e) {
+    console.error(e);
+    body.innerHTML = "⚠️ 業務管理の台帳を読み込めませんでした(通信を確認してください)";
+    return;
+  }
+  const masterByKey = {};
+  vehicles.forEach(mv => { if (mv.number) masterByKey[ledgerKey(mv.number)] = mv; });
+
+  const plan = { updates:{}, fills:[], conflicts:[], news:[], skipped:[] };
+  const usedMaster = new Set();
+  ledger.forEach(v => {
+    let mv = null;
+    if (v.plateNumber) mv = masterByKey[ledgerKey(v.plateNumber)];
+    if (!mv && v.nickname) mv = masterByKey[ledgerKey(v.nickname)];
+    if (!mv) {
+      const number = (v.plateNumber || "").trim();
+      if (!number) { plan.skipped.push(v); return; }
+      if (plan.news.some(n => ledgerKey(n.data.number) === ledgerKey(number))) return;
+      const data = { number };
+      LEDGER_FIELDS.forEach(f => { const lv = ledgerVal(f, v); data[f.m] = lv; });
+      data.insurerMemo = "";
+      plan.news.push({ data, label: (data.nickname ? data.nickname + " / " : "") + number });
+      return;
+    }
+    if (usedMaster.has(mv.id)) return; // 同じ車両が台帳に2件ある場合は1件目だけ
+    usedMaster.add(mv.id);
+    const name = (mv.nickname ? mv.nickname + " / " : "") + mv.number;
+    LEDGER_FIELDS.forEach(f => {
+      const lv = ledgerVal(f, v);
+      const cur = mv[f.m];
+      if (isBlank(lv)) return;
+      if (isBlank(cur)) {
+        plan.fills.push({ id:mv.id, name, f, val:lv });
+      } else if (f.conflict && normCmp(cur, f.num) !== normCmp(lv, f.num)) {
+        plan.conflicts.push({ id:mv.id, name, f, master:String(cur), ledger:lv });
+      }
+    });
+  });
+  importPlan = plan;
+  renderImportPlan();
+}
+
+function renderImportPlan(){
+  const p = importPlan, body = document.getElementById("importBody");
+  if (!p.fills.length && !p.conflicts.length && !p.news.length) {
+    body.innerHTML = `<div style="padding:16px;text-align:center;color:#0f766e;font-weight:bold;">✅ 食い違いはありません<br><span style="font-weight:normal;font-size:13px;color:#64748b;">台帳とマスタの車両情報はそろっています</span></div>`;
+    document.getElementById("importRunBtn").style.display = "none";
+    return;
+  }
+  let h = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+    <span class="badge" style="background:#fef3c7;color:#92400e;">⚠️ 食い違い ${p.conflicts.length}件</span>
+    <span class="badge" style="background:#dcfce7;color:#166534;">✏️ 空欄を埋める ${p.fills.length}件</span>
+    <span class="badge" style="background:#dbeafe;color:#1e40af;">➕ マスタに新規登録 ${p.news.length}台</span>
+  </div>`;
+
+  if (p.conflicts.length) {
+    h += `<div style="font-weight:bold;margin:8px 0 4px;">⚠️ 食い違い(残す方を選んでください)</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:6px;">車検証を見て正しい方を選んでください。最初は「マスタ(今のまま)」が選ばれています。</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <button class="btn btn-sub" style="flex:1;font-size:12px;padding:6px;" onclick="setAllConflicts('master')">全部マスタにする</button>
+        <button class="btn btn-sub" style="flex:1;font-size:12px;padding:6px;" onclick="setAllConflicts('ledger')">全部台帳にする</button>
+      </div>`;
+    let lastName = null;
+    p.conflicts.forEach((c, i) => {
+      if (c.name !== lastName) { h += `<div style="margin-top:10px;font-weight:bold;color:#0d9488;">🚚 ${esc(c.name)}</div>`; lastName = c.name; }
+      h += `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px 10px;margin-top:4px;">
+        <div style="font-size:12px;color:#92400e;margin-bottom:4px;">${esc(c.f.label)}</div>
+        <label style="display:flex;align-items:center;gap:6px;padding:3px 0;"><input type="radio" name="cf${i}" value="master" checked> マスタ:<b>${esc(c.master)}</b></label>
+        <label style="display:flex;align-items:center;gap:6px;padding:3px 0;"><input type="radio" name="cf${i}" value="ledger"> 台帳:<b>${esc(c.ledger)}</b></label>
+      </div>`;
+    });
+  }
+  if (p.news.length) {
+    h += `<div style="font-weight:bold;margin:16px 0 4px;">➕ マスタにない車両(新しく登録します)</div>`;
+    p.news.forEach((n, i) => {
+      h += `<label style="display:flex;align-items:center;gap:6px;padding:4px 0;"><input type="checkbox" id="nw${i}" checked> ${esc(n.label)}</label>`;
+    });
+    h += `<div style="font-size:12px;color:#64748b;">いらない車両(廃車など)はチェックを外してください</div>`;
+  }
+  if (p.fills.length) {
+    h += `<details style="margin-top:16px;"><summary style="font-weight:bold;cursor:pointer;">✏️ マスタの空欄を台帳の値で埋める(${p.fills.length}件)</summary>`;
+    let lastName = null;
+    p.fills.forEach(fl => {
+      if (fl.name !== lastName) { h += `<div style="margin-top:8px;font-weight:bold;color:#0d9488;">🚚 ${esc(fl.name)}</div>`; lastName = fl.name; }
+      h += `<div style="font-size:13px;padding:2px 0 2px 8px;">${esc(fl.f.label)}:${esc(fl.val)}</div>`;
+    });
+    h += `</details>`;
+  }
+  if (p.skipped.length) {
+    h += `<div style="font-size:12px;color:#94a3b8;margin-top:12px;">※車番が空の台帳データ ${p.skipped.length}件は取り込みません</div>`;
+  }
+  body.innerHTML = h;
+  document.getElementById("importRunBtn").style.display = "";
+}
+
+function setAllConflicts(which){
+  importPlan.conflicts.forEach((c, i) => {
+    const r = document.querySelector(`input[name="cf${i}"][value="${which}"]`);
+    if (r) r.checked = true;
+  });
+}
+
+async function runLedgerImport(){
+  const p = importPlan; if (!p) return;
+  const updates = {};
+  const add = (id, k, v) => { (updates[id] = updates[id] || {})[k] = v; };
+  p.fills.forEach(fl => add(fl.id, fl.f.m, fl.val));
+  p.conflicts.forEach((c, i) => {
+    const r = document.querySelector(`input[name="cf${i}"]:checked`);
+    if (r && r.value === "ledger") add(c.id, c.f.m, c.ledger);
+  });
+  const newList = p.news.filter((n, i) => { const cb = document.getElementById("nw" + i); return cb && cb.checked; });
+  const nUpd = Object.keys(updates).length;
+  if (!nUpd && !newList.length) { toast("変更はありません"); closeLedgerImport(); return; }
+  if (!confirm(`マスタの車両 ${nUpd}台を更新、${newList.length}台を新規登録します。よろしいですか?`)) return;
+  const btn = document.getElementById("importRunBtn");
+  btn.disabled = true; btn.textContent = "取り込み中…";
+  try {
+    const ts = firebase.firestore.FieldValue.serverTimestamp();
+    const batch = db.batch();
+    Object.entries(updates).forEach(([id, data]) => batch.update(db.collection(COL).doc(id), { ...data, updatedAt: ts }));
+    newList.forEach(n => batch.set(db.collection(COL).doc(), { ...n.data, createdAt: ts, updatedAt: ts }));
+    await batch.commit();
+    toast("✅ 取り込みました");
+    // 取り込み後にもう一度見くらべて結果を表示
+    setTimeout(openLedgerImport, 600);
+  } catch(e) {
+    console.error(e);
+    toast("⚠️ 取り込みに失敗しました");
+  } finally {
+    btn.disabled = false; btn.textContent = "この内容で取り込む";
+  }
+}
+function closeLedgerImport(){
+  document.getElementById("importModalBg").classList.remove("show");
+  importPlan = null;
+}
 
 function toast(msg) {
   const t = document.getElementById("toast");
