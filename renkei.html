@@ -54,6 +54,15 @@
   .alone-chip small { color:#64748b; font-weight:400; }
   .alone-wrap { display:flex; align-items:center; gap:6px; }
 
+  /* 押すとアプリへ飛ぶ */
+  a.go { color:inherit; text-decoration:none; cursor:pointer; }
+  a.go::after { content:" ↗"; font-size:.8em; color:#0d9488; font-weight:700; }
+  a.go:active { opacity:.6; }
+  a.go.app-chip:hover, a.go.alone-chip:hover { background:#ccfbf1; }
+  .url-row { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
+  .url-row b { font-size:13px; }
+  .url-row input { font-size:14px; padding:9px 10px; }
+
   /* 編集モードの部品 */
   .edit-btns { display:flex; gap:6px; margin-top:8px; }
   .edit-btns.inline { margin-top:0; margin-left:auto; }
@@ -110,13 +119,16 @@
   <button class="mode-btn" id="editModeBtn" onclick="toggleEdit()">✏️ 編集モード</button>
   <button class="mode-btn" onclick="window.print()">🖨️ 印刷</button>
 </div>
+<div class="top-btns edit-only hidden">
+  <button class="mode-btn" onclick="openUrlModal()">🔗 アプリのアドレスを編集</button>
+</div>
 
 <!-- 1. マスター参照 -->
 <div class="section">
   <h2>1️⃣ マスター管理からの参照</h2>
   <div class="sec-note">マスタ管理に登録したデータを、下の各アプリが読み込んで使う。</div>
   <div class="hub">
-    <span class="hub-name">マスター管理</span>
+    <a class="hub-name go" href="index.html">マスター管理</a>
     <div class="hub-sub">共通マスタ管理アプリ</div>
   </div>
   <div class="trunk"></div>
@@ -218,6 +230,19 @@
   </div>
 </div>
 
+<!-- アドレス編集モーダル -->
+<div class="modal-bg" id="urlModalBg">
+  <div class="modal">
+    <h3>🔗 アプリのアドレス</h3>
+    <div class="sec-note">ここに入れたアドレスが、一覧のアプリ名を押したときに開きます。空欄にすると押せなくなります。</div>
+    <div id="urlList"></div>
+    <div class="modal-btns">
+      <button class="btn btn-sub" onclick="closeModals()">キャンセル</button>
+      <button class="btn btn-main" onclick="saveUrls()">保存</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -259,6 +284,66 @@ const SEED = {
     { name:"無事故無違反", note:"" }
   ]
 };
+
+/* ---------- アプリのアドレス(初期値。編集モードで変更可) ---------- */
+const GH = "https://rie4649.github.io/";
+const DEFAULT_URLS = {
+  "マスター管理": GH+"sekine-master/",
+  "点検ラクラク": GH+"tenken-rakuraku/",
+  "タイヤ管理": GH+"sekine-tire/",
+  "機械作業": GH+"kikai-sagyo/",
+  "業務管理": GH+"sharyo-daicho/",
+  "ISO管理": GH+"iso-kanri/",
+  "配車ボード": GH+"haisha-board/",
+  "引取先管理": GH+"hikitorisaki-kanri/",
+  "社内掲示板": GH+"shanai-keijiban/",
+  "電話依頼": GH+"denwa-irai/",
+  "取引確認書": GH+"torihiki01/",
+  "単価管理": GH+"tanka-kanri/",
+  "外注スケジュール": GH+"gaichu-schedule/",
+  "無事故無違反": GH+"buji-buihan/",
+  "関根新聞": GH+"sekine-shinbun/",
+  "関根ストア": GH+"sekine-store/"
+};
+function baseName(n){ return String(n||"").replace(/[（(].*$/,"").trim(); }
+function urlOf(n){
+  const b = baseName(n);
+  const u = state && state.urls ? state.urls[b] : undefined;
+  return (u !== undefined) ? u : (DEFAULT_URLS[b] || "");
+}
+/* 名前を「押すと飛ぶリンク」にする(編集モード中は押しても飛ばない) */
+function goLink(name, cls, inner){
+  const u = urlOf(name);
+  const html = inner != null ? inner : esc(name);
+  if (!u || editMode) return `<span class="${cls}">${html}</span>`;
+  return `<a class="${cls} go" href="${esc(u)}" target="_blank" rel="noopener">${html}</a>`;
+}
+/* 「電話依頼・社内掲示板」のような複数名は1つずつリンクに */
+function goMulti(text, cls){
+  return String(text||"").split("・").map(t => goLink(t.trim(), cls)).join("・");
+}
+function allAppNames(){
+  const set = new Set(Object.keys(DEFAULT_URLS));
+  (state.masters||[]).forEach(m => (m.apps||[]).forEach(a => set.add(baseName(a))));
+  ["external","applinks"].forEach(sec => (state[sec]||[]).forEach(r => {
+    set.add(baseName(r.app)); String(r.target||"").split("・").forEach(t => set.add(baseName(t)));
+  }));
+  (state.standalone||[]).forEach(a => set.add(baseName(a.name)));
+  Object.keys(state.urls||{}).forEach(k => set.add(k));
+  set.delete("");
+  return Array.from(set);
+}
+function openUrlModal(){
+  document.getElementById("urlList").innerHTML = allAppNames().map((n,i) =>
+    `<div class="url-row"><b>${esc(n)}</b><input type="text" data-n="${esc(n)}" value="${esc(urlOf(n))}" placeholder="https://… (なければ空欄)" inputmode="url"></div>`).join("");
+  document.getElementById("urlModalBg").classList.add("show");
+}
+function saveUrls(){
+  const urls = {};
+  document.querySelectorAll("#urlList input").forEach(inp => { urls[inp.dataset.n] = inp.value.trim(); });
+  state.urls = urls;
+  closeModals(); saveAll("アドレスを保存しました");
+}
 
 let state = null;
 let editMode = false;
@@ -317,7 +402,7 @@ function renderAll(){
         <span class="master-name">${esc(m.name)}</span>
         <span class="master-sub">${esc(m.sub)}</span>
       </div>
-      <div class="app-chips">${(m.apps||[]).map(a=>`<span class="app-chip">${esc(a)}</span>`).join("")}</div>
+      <div class="app-chips">${(m.apps||[]).map(a=>goLink(a, "app-chip")).join("")}</div>
       ${moveBtns("masters", i, state.masters.length)}
     </div>`).join("");
 
@@ -327,11 +412,11 @@ function renderAll(){
     el.innerHTML = (state[sec]||[]).map((r,i)=>`
       <div class="link-card">
         <div class="link-line">
-          <span class="l-app">${esc(r.app)}</span>
+          ${goLink(r.app, "l-app")}
           ${r.sub ? `<span class="l-sub">${esc(r.sub)}</span>` : ""}
           <span class="l-arrow">${esc(r.arrow)}</span>
           ${r.tag ? `<span class="tag ${tagClass(r.tag)}">${esc(r.tag)}</span>` : ""}
-          <span class="l-target">${esc(r.target)}${r.targetSub ? ` <small>（${esc(r.targetSub)}）</small>` : ""}</span>
+          <span class="l-target">${goMulti(r.target, "")}${r.targetSub ? ` <small>（${esc(r.targetSub)}）</small>` : ""}</span>
         </div>
         ${r.note ? `<div class="l-note">${esc(r.note)}</div>` : ""}
         ${moveBtns(sec, i, state[sec].length)}
@@ -342,7 +427,7 @@ function renderAll(){
   const al = document.getElementById("aloneList");
   al.innerHTML = (state.standalone||[]).map((a,i)=>`
     <div class="alone-wrap">
-      <span class="alone-chip">${esc(a.name)}${a.note ? ` <small>（${esc(a.note)}）</small>` : ""}</span>
+      ${goLink(a.name, "alone-chip", esc(a.name)+(a.note ? ` <small>（${esc(a.note)}）</small>` : ""))}
       ${editMode ? `<div class="edit-btns inline">
         <button class="mini-btn" onclick="moveItem('standalone',${i},-1)" ${i===0?"disabled":""}>▲</button>
         <button class="mini-btn" onclick="moveItem('standalone',${i},1)" ${i===state.standalone.length-1?"disabled":""}>▼</button>
