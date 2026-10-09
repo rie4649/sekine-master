@@ -211,6 +211,7 @@
 <div id="kanaIndex" style="display:flex;flex-wrap:wrap;gap:6px;margin:0 12px 10px;"></div>
 
 <button id="routeModeBtn" onclick="toggleRouteMode()">🗺 運搬ルート作成(回る順に取引先を選ぶ)</button>
+<button id="similarBtn" onclick="openSimilarList()" style="display:block;margin:0 12px 10px;width:calc(100% - 24px);padding:11px;border:none;border-radius:12px;background:#fff;color:#b45309;font-size:14px;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.08);cursor:pointer;">🔍 似た名前を探す(ダブった取引先をまとめる)</button>
 
 <div class="section">
   <h2>➕ 取引先を登録</h2>
@@ -309,7 +310,17 @@
       <button class="btn btn-sub" onclick="closeClientEdit()">キャンセル</button>
       <button class="btn btn-main" onclick="saveClientEdit()">保存</button>
     </div>
+    <button class="btn btn-sub" style="margin-top:10px" onclick="openMergePick()">🔗 別の取引先にまとめる(表記ゆれの統合)</button>
     <button class="btn btn-danger" style="margin-top:10px" onclick="deleteClient()">🗑 この取引先を削除</button>
+  </div>
+</div>
+
+<!-- 取引先の統合モーダル -->
+<div class="modal-bg" id="mergeModalBg" onclick="if(event.target===this)closeMerge()">
+  <div class="modal">
+    <h3 id="mergeTitle">🔗 取引先をまとめる</h3>
+    <div id="mergeBody"></div>
+    <div class="modal-btns"><button class="btn btn-sub" onclick="closeMerge()">閉じる</button></div>
   </div>
 </div>
 
@@ -1162,6 +1173,152 @@ async function deleteClient() {
     closeClientEdit();
     toast("🗑 削除しました");
   } catch(e) { console.error(e); toast("⚠️ 削除に失敗しました"); }
+}
+
+/* ---------- 取引先の統合(表記ゆれでダブったものを1つにまとめる) 2026-10 ----------
+   残す取引先を選ぶと、
+   ・関根カレンダーの予定(calendarEvents)の会社名と紐づけを残すほうに付け替え
+   ・電話依頼(phoneRequests)の会社名も残すほうに直す
+   ・消すほうにだけ入っていた よみがな・住所・電話番号 は残すほうへ引き継ぎ
+   ・消すほうの取引先を削除
+   ※配車ボードは、カレンダーの予定が直ると自動で反映されます */
+const MERGE_IGNORE_KEY = "sekine_merge_ignore";
+function simKey(s) {
+  return (s || "").normalize("NFKC")
+    .replace(/株式会社|有限会社|合同会社|合資会社|\(株\)|\(有\)|（株）|（有）/g, "")
+    .replace(/[\s・.,，、。\-－―‐ー~〜]/g, "")
+    .replace(/[ァ-ヶ]/g, m => String.fromCharCode(m.charCodeAt(0) - 0x60))
+    .toLowerCase();
+}
+function editDist(a, b) {
+  if (Math.abs(a.length - b.length) > 3) return 99;
+  const dp = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    dp[i][j] = Math.min(dp[i-1][j] + 1, dp[i][j-1] + 1, dp[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+  return dp[a.length][b.length];
+}
+// 2つの会社名が「たぶん同じ会社」か
+function isSimilarName(n1, n2) {
+  const a = simKey(n1), b = simKey(n2);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const s = a.length <= b.length ? a : b, l = a.length <= b.length ? b : a;
+  if (s.length >= 4 && l.includes(s) && l.length - s.length <= 3) return true;
+  const d = editDist(a, b);
+  return (s.length >= 4 && d <= 1) || (s.length >= 8 && d <= 2);
+}
+function isSimilarClient(x, y) {
+  if (isSimilarName(x.name, y.name)) return true;
+  const ya = simKey(x.yomi), yb = simKey(y.yomi);
+  return ya.length >= 3 && ya === yb;
+}
+function mergeIgnored() { try { return JSON.parse(localStorage.getItem(MERGE_IGNORE_KEY) || "[]"); } catch(e) { return []; } }
+function pairKey(id1, id2) { return [id1, id2].sort().join("|"); }
+function clientSub(c) { return esc([c.yomi, c.address, c.tel, c.note].filter(Boolean).join(" ・ ")) || "(住所・電話なし)"; }
+
+function closeMerge() { document.getElementById("mergeModalBg").classList.remove("show"); }
+
+// 似た名前の一覧
+function openSimilarList() {
+  const ign = new Set(mergeIgnored());
+  const pairs = [];
+  for (let i = 0; i < clients.length; i++) for (let j = i + 1; j < clients.length; j++) {
+    const a = clients[i], b = clients[j];
+    if (ign.has(pairKey(a.id, b.id))) continue;
+    if (isSimilarClient(a, b)) pairs.push([a, b]);
+  }
+  pairs.sort((p, q) => (p[0].yomi || p[0].name).localeCompare(q[0].yomi || q[0].name, "ja"));
+  document.getElementById("mergeTitle").textContent = `🔍 似た名前の取引先(${pairs.length}組)`;
+  const side = (keep, drop) => `
+      <div style="flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:12px;padding:10px;">
+        <div style="font-weight:700;font-size:15px;word-break:break-all;">${esc(keep.name)}</div>
+        <div style="font-size:12px;color:#64748b;margin:4px 0 8px;word-break:break-all;">${clientSub(keep)}</div>
+        <button class="btn btn-main" style="padding:8px;font-size:13px;" onclick="confirmMerge('${drop.id}','${keep.id}')">こちらを残す</button>
+      </div>`;
+  document.getElementById("mergeBody").innerHTML = pairs.length ? `
+    <div class="hint" style="margin-bottom:12px;font-size:13px;color:#475569;line-height:1.6;">同じ会社なら<b>正しいほうの「こちらを残す」</b>を押してください。カレンダーの予定・電話依頼の会社名も付け替えて、もう片方を消します。<br>別の会社なら「別の会社」を押すと、この一覧に出なくなります。</div>
+    ${pairs.map(([a, b]) => `
+    <div style="background:#f8fafc;border-radius:14px;padding:10px;margin-bottom:10px;">
+      <div style="display:flex;gap:8px;">${side(a, b)}${side(b, a)}</div>
+      <button class="btn btn-sub" style="margin-top:8px;padding:8px;font-size:13px;" onclick="ignorePair('${a.id}','${b.id}')">別の会社(この組は今後出さない)</button>
+    </div>`).join("")}` : `<div class="empty">似た名前の取引先は見つかりませんでした 🎉</div>`;
+  document.getElementById("mergeModalBg").classList.add("show");
+}
+function ignorePair(id1, id2) {
+  const list = mergeIgnored(); list.push(pairKey(id1, id2));
+  try { localStorage.setItem(MERGE_IGNORE_KEY, JSON.stringify(list)); } catch(e) {}
+  openSimilarList();
+}
+
+// 編集画面から「別の取引先にまとめる」
+function openMergePick() {
+  const from = clients.find(x => x.id === editingClientId);
+  if (!from) return;
+  closeClientEdit();
+  document.getElementById("mergeTitle").textContent = `🔗「${from.name}」をまとめる先を選ぶ`;
+  document.getElementById("mergeBody").innerHTML = `
+    <div class="hint" style="margin-bottom:10px;font-size:13px;color:#475569;line-height:1.6;">残すほう(正しい会社名)を選んでください。「${esc(from.name)}」は消えて、カレンダーの予定・電話依頼は選んだ会社に付け替わります。</div>
+    <input type="text" id="mergeSearch" placeholder="🔍 会社名・よみがなで検索" oninput="renderMergePick('${from.id}')" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;margin-bottom:10px;">
+    <div id="mergePickList"></div>`;
+  renderMergePick(from.id);
+  document.getElementById("mergeModalBg").classList.add("show");
+}
+function renderMergePick(fromId) {
+  const from = clients.find(x => x.id === fromId);
+  if (!from) return;
+  const q = (document.getElementById("mergeSearch").value || "").trim();
+  let list = clients.filter(c => c.id !== fromId);
+  if (q) list = list.filter(c => [c.name, c.yomi].some(v => (v || "").includes(q)));
+  else list = list.filter(c => isSimilarClient(from, c));
+  list.sort((a, b) => (a.yomi || a.name).localeCompare(b.yomi || b.name, "ja"));
+  document.getElementById("mergePickList").innerHTML = list.length ? (!q ? `<div style="font-size:12px;color:#0d9488;font-weight:700;margin-bottom:6px;">似た名前の候補</div>` : "") +
+    list.slice(0, 50).map(c => `
+    <div class="v-card" style="margin:0 0 8px;cursor:pointer;" onclick="confirmMerge('${fromId}','${c.id}')">
+      <div class="v-info"><div class="v-number">${esc(c.name)}</div><div class="v-model">${clientSub(c)}</div></div>
+      <div style="color:#0d9488;font-weight:700;font-size:13px;white-space:nowrap;">ここに<br>まとめる</div>
+    </div>`).join("")
+    : `<div class="empty">${q ? "見つかりません" : "似た名前の候補はありません。上の検索で探してください。"}</div>`;
+}
+
+async function confirmMerge(fromId, toId) {
+  const from = clients.find(x => x.id === fromId), to = clients.find(x => x.id === toId);
+  if (!from || !to) { toast("⚠️ 取引先が見つかりません(画面を開き直してください)"); return; }
+  if (!confirm(`「${from.name}」を消して、\n「${to.name}」にまとめます。\n\n・カレンダーの予定と電話依頼の会社名を「${to.name}」に直します\n・この操作は元に戻せません\n\nよろしいですか?`)) return;
+  toast("⏳ まとめています…");
+  try {
+    // 付け替える予定・電話依頼を集める
+    const evDocs = new Map();
+    const [byId, byName, phones] = await Promise.all([
+      db.collection("calendarEvents").where("clientId", "==", from.id).get(),
+      db.collection("calendarEvents").where("title", "==", from.name).get(),
+      db.collection("phoneRequests").where("client", "==", from.name).get()
+    ]);
+    byId.forEach(d => evDocs.set(d.id, d));
+    byName.forEach(d => evDocs.set(d.id, d));
+    const ops = [];
+    evDocs.forEach(d => ops.push([d.ref, { title: to.name, clientId: to.id, yomi: to.yomi || from.yomi || d.data().yomi || "" }]));
+    phones.forEach(d => ops.push([d.ref, { client: to.name }]));
+    // 残すほうに空欄があれば引き継ぐ
+    const fill = {};
+    ["yomi", "address", "tel"].forEach(k => { if (!(to[k] || "").trim() && (from[k] || "").trim()) fill[k] = from[k]; });
+    if (Object.keys(fill).length) {
+      fill.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      ops.push([db.collection(CLIENT_COL).doc(to.id), fill]);
+    }
+    // 400件ずつ書き込み(1回の上限500件)
+    for (let i = 0; i < ops.length; i += 400) {
+      const batch = db.batch();
+      ops.slice(i, i + 400).forEach(([ref, data]) => batch.update(ref, data));
+      await batch.commit();
+    }
+    await db.collection(CLIENT_COL).doc(from.id).delete();
+    closeMerge();
+    toast(`✅「${to.name}」にまとめました(予定${evDocs.size}件・電話依頼${phones.size}件を付け替え)`);
+  } catch(e) {
+    console.error(e);
+    toast("⚠️ まとめられませんでした。通信を確認して、もう一度お試しください");
+  }
 }
 
 /* ---------- PWAインストール ---------- */
