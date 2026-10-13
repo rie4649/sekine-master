@@ -1344,6 +1344,10 @@ window.addEventListener("appinstalled", () => {
 let toastTimer;
 /* ---------- 契約マスタ ---------- */
 const CONTRACT_COL = "master_contracts";
+/* 契約を保存・削除したら、更新日時を master_meta/contracts に記録(ISO管理の「契約件数」に最終更新日として出る) */
+function stampContractUpdate(action){
+  return db.collection("master_meta").doc("contracts").set({ updatedAt: firebase.firestore.FieldValue.serverTimestamp(), updatedMs: Date.now(), lastAction: action || "" }, { merge: true }).catch(e => console.error(e));
+}
 let contracts = [];
 let contractsLoaded = false;
 function contractDocId(sheet, company, route){
@@ -1504,6 +1508,7 @@ window.saveContractEdit = async function(){
   try {
     await db.collection(CONTRACT_COL).doc(newId).set(data);
     if (oldId && newId !== oldId) await db.collection(CONTRACT_COL).doc(oldId).delete();
+    stampContractUpdate(oldId ? "修正" : "追加");
     contracts = contracts.filter(x => x.id !== oldId && x.id !== newId).concat([Object.assign({ id: newId }, data)]);
     closeContractEdit();
     renderContracts();
@@ -1667,6 +1672,7 @@ window.deleteContract = async function(id){
   const c = contracts.find(x => x.id === id);
   if (!confirm((c ? c.company + " / " + c.sheet : "この契約") + " を削除しますか？")) return;
   await db.collection(CONTRACT_COL).doc(id).delete();
+  stampContractUpdate("削除");
   contracts = contracts.filter(x => x.id !== id);
   renderContracts();
   toast("削除しました");
