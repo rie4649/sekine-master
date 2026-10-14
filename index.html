@@ -14,8 +14,8 @@
   header { background:linear-gradient(135deg,#1e293b,#334155); color:#fff; padding:16px; position:sticky; top:0; z-index:50; }
   header h1 { font-size:20px; display:flex; align-items:center; gap:8px; }
   header .sub { font-size:11px; opacity:.7; margin-top:2px; letter-spacing:1px; }
-  .tab-bar { display:flex; gap:8px; margin-top:12px; }
-  .tab-btn { flex:1; padding:10px; border:none; border-radius:10px; background:rgba(255,255,255,.12); color:#cbd5e1; font-size:14px; font-weight:700; }
+  .tab-bar { display:flex; gap:8px; margin-top:12px; overflow-x:auto; }
+  .tab-btn { flex:1; white-space:nowrap; padding:10px; border:none; border-radius:10px; background:rgba(255,255,255,.12); color:#cbd5e1; font-size:14px; font-weight:700; }
   .tab-btn.active { background:#0d9488; color:#fff; }
   #installBtn { position:absolute; top:14px; right:14px; padding:8px 12px; border:none; border-radius:10px; background:#0d9488; color:#fff; font-size:13px; font-weight:700; display:none; }
   .summary { display:flex; gap:10px; padding:12px 16px; }
@@ -102,10 +102,12 @@
     <button class="tab-btn" id="tabBtnClients" onclick="switchTab('clients')">🏢 取引先</button>
     <button class="tab-btn" id="tabBtnContracts" onclick="switchTab('contracts')">📋 契約</button>
     <button class="tab-btn" id="tabBtnStaff" onclick="switchTab('staff')">👤 従業員</button>
+    <button class="tab-btn" id="tabBtnWorkcal" onclick="switchTab('workcal')">📅 就業日</button>
     <button class="tab-btn" onclick="location.href='kyoka.html'">📜 許可証</button>
   <button class="tab-btn" onclick="location.href='renkei.html'">🔗 連動</button> 
   </div>
 </header>
+<div id="workcalWarn" style="display:none;margin:10px 12px 0;padding:12px 14px;border-radius:12px;background:#fef2f2;border:1.5px solid #fca5a5;color:#b91c1c;font-size:14px;font-weight:700;" onclick="switchTab('workcal')"></div>
 
 <div id="tabVehicles">
 
@@ -274,7 +276,40 @@
     <button class="btn btn-main" style="width:auto;padding:10px 18px;" onclick="addStaffMember()">追加</button>
   </div>
 </div>
+<div class="section" id="teamCopyBox" style="display:none;">
+  <h2>🔁 配車ボードの班を写す(1回だけ)</h2>
+  <div style="font-size:13px;color:#64748b;margin-bottom:10px;">これまで配車ボードの設定で決めていた班(A班/B班/Free)を、ここの従業員にそのまま写します。写したあとは、班はこの画面でだけ変えられます(配車ボードは見るだけになります)。</div>
+  <button class="btn btn-main" id="teamCopyBtn" onclick="copyTeamsFromBoard()">配車ボードの班を写す</button>
+</div>
 <div id="staffListWrap" style="padding:0 12px;"></div>
+</div>
+
+<div id="tabWorkcal" style="display:none;">
+<div class="section">
+  <h2>📅 就業カレンダー(関根商店)</h2>
+  <div style="font-size:13px;color:#64748b;margin-bottom:10px;">1年分(3/21〜翌3/20)をまとめて登録します。日付ごとに「全休」「A班休み」「B班休み」が入ります。記載のない日は出勤日です。配車ボード・関根カレンダー・ISO管理に表示されます。</div>
+  <div id="workcalPeriods"></div>
+  <label class="btn btn-sub" style="text-align:center;margin-top:10px;">📥 JSONファイルから登録・上書き<input type="file" accept=".json,application/json" style="display:none;" onchange="importWorkcalFile(this)"></label>
+</div>
+<div class="section" id="workcalMonthBox" style="display:none;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <button class="btn btn-sub" style="width:auto;padding:8px 14px;" onclick="workcalMove(-1)">◀</button>
+    <div id="workcalMonthTitle" style="font-weight:700;font-size:16px;"></div>
+    <button class="btn btn-sub" style="width:auto;padding:8px 14px;" onclick="workcalMove(1)">▶</button>
+  </div>
+  <div style="font-size:12px;color:#64748b;margin-bottom:8px;">日付を押すと、臨時休みの追加・取り消しができます(登録した内容より優先されます)。<span style="color:#b45309;font-weight:700;">手</span> = 手で直した日</div>
+  <div id="workcalGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;"></div>
+</div>
+</div>
+
+<!-- 就業カレンダー 1日の変更 -->
+<div class="modal-bg" id="workcalDayBg" onclick="if(event.target===this)closeWorkcalDay()">
+  <div class="modal">
+    <h3 id="workcalDayTitle"></h3>
+    <div id="workcalDayInfo" style="font-size:13px;color:#64748b;margin-bottom:12px;"></div>
+    <div id="workcalDayBtns" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+    <button class="btn btn-sub" style="margin-top:14px;" onclick="closeWorkcalDay()">閉じる</button>
+  </div>
 </div>
 
 <!-- 契約 編集モーダル -->
@@ -817,11 +852,14 @@ function switchTab(tab) {
   document.getElementById("tabClients").style.display = (tab === "clients") ? "block" : "none";
   document.getElementById("tabContracts").style.display = (tab === "contracts") ? "block" : "none";
   document.getElementById("tabStaff").style.display = (tab === "staff") ? "block" : "none";
+  document.getElementById("tabWorkcal").style.display = (tab === "workcal") ? "block" : "none";
   document.getElementById("tabBtnVehicles").classList.toggle("active", tab === "vehicles");
   document.getElementById("tabBtnClients").classList.toggle("active", tab === "clients");
   document.getElementById("tabBtnContracts").classList.toggle("active", tab === "contracts");
   document.getElementById("tabBtnStaff").classList.toggle("active", tab === "staff");
+  document.getElementById("tabBtnWorkcal").classList.toggle("active", tab === "workcal");
   if (tab === "staff") loadStaffTab();
+  if (tab === "workcal") renderWorkcal();
   if (tab === "contracts") { mDispFilter = ""; mSheetFilter = ""; mKanaFilter = ""; loadContracts(); }
   if (tab !== "clients" && routeMode) toggleRouteMode();
 }
@@ -839,6 +877,9 @@ function loadStaffTab() {
     staffMembers.sort((a,b) => eo(a) - eo(b));
     renderStaffTab();
   }, err => { console.error(err); toast("⚠️ 従業員の読み込みエラー"); });
+  db.collection("master_meta").doc("teamCopy").get().then(d => {
+    document.getElementById("teamCopyBox").style.display = d.exists ? "none" : "block";
+  }).catch(e => console.error(e));
 }
 function renderStaffTab() {
   const wrap = document.getElementById("staffListWrap");
@@ -847,6 +888,7 @@ function renderStaffTab() {
     <div class="v-card">
       <div class="v-info">
         <div class="v-number">${i + 1}. ${esc(e.name || "")}</div>
+        <div style="display:flex;gap:6px;margin-top:6px;">${["A","B","free"].map(t => `<button onclick="setStaffTeam('${e.id}','${t}')" style="border:1.5px solid ${TEAM_COLOR[t]};background:${e.team === t ? TEAM_COLOR[t] : "#fff"};color:${e.team === t ? "#fff" : TEAM_COLOR[t]};border-radius:999px;padding:4px 12px;font-size:13px;font-weight:700;">${TEAM_LABEL[t]}</button>`).join("")}${e.team ? "" : '<span style="font-size:12px;color:#94a3b8;align-self:center;">班未設定</span>'}</div>
       </div>
       <div style="display:flex;gap:6px;">
         <button onclick="moveStaffMember('${e.id}',-1)" style="border:none;background:#f1f5f9;color:#334155;border-radius:8px;padding:8px 12px;">▲</button>
@@ -867,6 +909,38 @@ async function addStaffMember() {
     toast("✅ 追加しました");
   } catch(e) { toast("⚠️ 追加に失敗しました"); }
 }
+/* 班(A班/B班/フリー)。配車ボード・関根カレンダーはここの employees.team を読むだけ */
+const TEAM_LABEL = { A:"A班", B:"B班", free:"フリー" };
+const TEAM_COLOR = { A:"#1976d2", B:"#2e7d32", free:"#e91e63" };
+window.setStaffTeam = async function(id, team) {
+  const e = staffMembers.find(x => x.id === id);
+  if (!e) return;
+  const next = e.team === team ? null : team;
+  try {
+    await db.collection(STAFF_COL).doc(id).update({ team: next });
+    toast(next ? "✅ " + e.name + " → " + TEAM_LABEL[next] : "✅ " + e.name + " の班を外しました");
+  } catch(err) { console.error(err); toast("⚠️ 保存に失敗しました"); }
+};
+/* 配車ボード(pickupSettings/workerBentoProfiles の profiles[名前].team)の班を、1回だけ employees.team へ写す */
+window.copyTeamsFromBoard = async function() {
+  const btn = document.getElementById("teamCopyBtn");
+  btn.disabled = true;
+  try {
+    const d = await db.collection("pickupSettings").doc("workerBentoProfiles").get();
+    const profiles = (d.exists && d.data().profiles) || {};
+    const hits = staffMembers.filter(e => profiles[e.name] && TEAM_LABEL[profiles[e.name].team]);
+    const misses = staffMembers.filter(e => !hits.includes(e)).map(e => e.name);
+    if (!confirm(hits.length + "人の班を写します。\n\n" + hits.map(e => "・" + e.name + " → " + TEAM_LABEL[profiles[e.name].team]).join("\n") +
+      (misses.length ? "\n\n配車ボードで班が決まっていない人(あとでここで設定):\n" + misses.join("、") : ""))) return;
+    const batch = db.batch();
+    hits.forEach(e => batch.update(db.collection(STAFF_COL).doc(e.id), { team: profiles[e.name].team }));
+    batch.set(db.collection("master_meta").doc("teamCopy"), { doneAt: firebase.firestore.FieldValue.serverTimestamp(), count: hits.length });
+    await batch.commit();
+    document.getElementById("teamCopyBox").style.display = "none";
+    toast("✅ " + hits.length + "人の班を写しました");
+  } catch(err) { console.error(err); toast("⚠️ 写せませんでした"); }
+  finally { btn.disabled = false; }
+};
 window.moveStaffMember = async function(id, dir) {
   const idx = staffMembers.findIndex(e => e.id === id);
   const j = idx + dir;
@@ -1906,6 +1980,152 @@ function closeLedgerImport(){
   document.getElementById("importModalBg").classList.remove("show");
   importPlan = null;
 }
+
+/* ---------- 就業カレンダー(workCalendars/{会社}_{開始日} に1期間=1件) ----------
+   { owner:"sekine", ownerName, start:"2026-03-21", end:"2027-03-20", days:{日付:"全休"|"A"|"B"}, overrides:{日付:"全休"|"A"|"B"|"出勤"} }
+   days = 写真から作った内容、overrides = 手で直した臨時休み・取り消し(days より優先)。記載のない日は出勤、どの期間にも入らない日は「未登録」。
+   owner を変えれば他社(引取先)の休業日も同じ形で持てる */
+const WORKCAL_COL = "workCalendars";
+const WORKCAL_OWNER = "sekine", WORKCAL_OWNER_NAME = "関根商店";
+const WORKCAL_LABEL = { "全休":"全休", A:"A班休み", B:"B班休み", "出勤":"出勤" };
+const WORKCAL_SHORT = { "全休":"全休", A:"A休", B:"B休" };
+const WORKCAL_COLOR = { "全休":"#dc2626", A:"#1976d2", B:"#2e7d32" };
+let workCals = [], workcalY = 0, workcalM = 0;
+function wcYmd(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+function workcalPeriodOf(ds){ return workCals.find(c => c.start <= ds && ds <= c.end) || null; }
+/* その日の区分。"全休"|"A"|"B"|""(出勤)、null = 未登録 */
+function workDayOf(ds){
+  const c = workcalPeriodOf(ds); if (!c) return null;
+  const o = (c.overrides || {})[ds];
+  if (o) return o === "出勤" ? "" : o;
+  return (c.days || {})[ds] || "";
+}
+db.collection(WORKCAL_COL).where("owner", "==", WORKCAL_OWNER).onSnapshot(snap => {
+  workCals = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => a.start < b.start ? -1 : 1);
+  renderWorkcalWarn();
+  if (document.getElementById("tabWorkcal").style.display === "block") renderWorkcal();
+  if (document.getElementById("workcalDayBg").classList.contains("show")) renderWorkcalDay();
+}, err => { console.error(err); toast("⚠️ 就業カレンダーの読み込みエラー"); });
+/* 3月に入ったら、3/21からの期間が未登録なら知らせる(今日が未登録のときも) */
+function renderWorkcalWarn(){
+  const now = new Date(), today = wcYmd(now), el = document.getElementById("workcalWarn");
+  let msg = "";
+  if (!workcalPeriodOf(today)) msg = "⚠️ 今日(" + (now.getMonth()+1) + "/" + now.getDate() + ")を含む就業カレンダーが未登録です";
+  else if (now.getMonth() === 2 && !workcalPeriodOf(now.getFullYear() + "-03-21")) msg = "⚠️ 3/21以降の就業カレンダーが未登録です";
+  el.innerHTML = msg ? esc(msg) + '<div style="font-size:12px;font-weight:400;margin-top:2px;">押すと登録の画面を開きます</div>' : "";
+  el.style.display = msg ? "block" : "none";
+}
+function renderWorkcal(){
+  const box = document.getElementById("workcalPeriods");
+  box.innerHTML = workCals.length ? workCals.map(c => {
+    const n = { "全休":0, A:0, B:0 };
+    Object.values(c.days || {}).forEach(v => { if (n[v] !== undefined) n[v]++; });
+    const ov = Object.keys(c.overrides || {}).length;
+    return `<div style="border:1.5px solid #cbd5e1;border-radius:12px;padding:10px 12px;margin-bottom:8px;">
+      <div style="font-weight:700;">${esc(c.start.replace(/-/g,"/"))} 〜 ${esc(c.end.replace(/-/g,"/"))}</div>
+      <div style="font-size:12px;color:#64748b;margin-top:2px;">全休 ${n["全休"]}日・A班休み ${n.A}日・B班休み ${n.B}日${ov ? "・手で直した日 " + ov + "日" : ""}</div>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button onclick="openWorkcalMonth('${c.start}')" style="border:none;background:#e0f2fe;color:#0369a1;border-radius:8px;padding:8px 12px;">📅 見る・直す</button>
+        <button onclick="deleteWorkcal('${c.id}')" style="border:none;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:8px 12px;">🗑</button>
+      </div></div>`;
+  }).join("") : '<div class="empty" style="padding:16px;">まだ登録されていません</div>';
+  const mb = document.getElementById("workcalMonthBox");
+  if (!workcalY && workCals.length){ const t = new Date(); workcalY = t.getFullYear(); workcalM = t.getMonth(); }
+  mb.style.display = workCals.length ? "block" : "none";
+  if (workCals.length) renderWorkcalMonth();
+}
+window.openWorkcalMonth = function(start){
+  workcalY = Number(start.slice(0,4)); workcalM = Number(start.slice(5,7)) - 1;
+  renderWorkcalMonth();
+  document.getElementById("workcalMonthBox").scrollIntoView({ behavior:"smooth" });
+};
+window.workcalMove = function(n){
+  workcalM += n;
+  if (workcalM < 0){ workcalM = 11; workcalY--; } if (workcalM > 11){ workcalM = 0; workcalY++; }
+  renderWorkcalMonth();
+};
+function renderWorkcalMonth(){
+  document.getElementById("workcalMonthTitle").textContent = workcalY + "年" + (workcalM+1) + "月";
+  const first = new Date(workcalY, workcalM, 1), last = new Date(workcalY, workcalM+1, 0).getDate();
+  let html = ["日","月","火","水","木","金","土"].map((w,i) => `<div style="text-align:center;font-size:11px;color:${i===0?"#dc2626":i===6?"#1d4ed8":"#64748b"};">${w}</div>`).join("");
+  for (let i = 0; i < first.getDay(); i++) html += "<div></div>";
+  for (let d = 1; d <= last; d++){
+    const ds = wcYmd(new Date(workcalY, workcalM, d)), w = workDayOf(ds), c = workcalPeriodOf(ds);
+    const manual = c && (c.overrides || {})[ds];
+    const wd = new Date(workcalY, workcalM, d).getDay();
+    html += `<div onclick="openWorkcalDay('${ds}')" style="min-height:52px;border-radius:8px;padding:4px;cursor:pointer;background:${w === null ? "#f1f5f9" : w ? WORKCAL_COLOR[w] + "18" : "#fff"};border:1px solid #e2e8f0;">
+      <div style="font-size:13px;font-weight:700;color:${wd===0?"#dc2626":wd===6?"#1d4ed8":"#1e293b"};">${d}${manual ? '<span style="color:#b45309;font-size:11px;margin-left:2px;">手</span>' : ""}</div>
+      <div style="font-size:11px;font-weight:700;color:${w ? WORKCAL_COLOR[w] : "#94a3b8"};">${w === null ? "未登録" : w ? WORKCAL_SHORT[w] : ""}</div></div>`;
+  }
+  document.getElementById("workcalGrid").innerHTML = html;
+}
+let workcalDay = "";
+window.openWorkcalDay = function(ds){
+  if (!workcalPeriodOf(ds)){ toast("この日を含む就業カレンダーが未登録です"); return; }
+  workcalDay = ds; renderWorkcalDay();
+  document.getElementById("workcalDayBg").classList.add("show");
+};
+window.closeWorkcalDay = function(){ document.getElementById("workcalDayBg").classList.remove("show"); workcalDay = ""; };
+function renderWorkcalDay(){
+  const ds = workcalDay, c = workcalPeriodOf(ds); if (!c) { closeWorkcalDay(); return; }
+  const base = (c.days || {})[ds] || "", o = (c.overrides || {})[ds] || "";
+  const d = new Date(ds + "T00:00:00");
+  document.getElementById("workcalDayTitle").textContent = (d.getMonth()+1) + "/" + d.getDate() + "(" + "日月火水木金土"[d.getDay()] + ")";
+  document.getElementById("workcalDayInfo").innerHTML = "登録した内容: <b>" + (base ? WORKCAL_LABEL[base] : "出勤") + "</b>" +
+    (o ? "<br>手で直した内容: <b style='color:#b45309;'>" + WORKCAL_LABEL[o] + "</b>(こちらが優先)" : "");
+  const cur = o || base || "出勤";
+  document.getElementById("workcalDayBtns").innerHTML = ["出勤","全休","A","B"].map(v =>
+    `<button class="btn ${cur === v ? "btn-main" : "btn-sub"}" onclick="setWorkcalOverride('${v}')">${WORKCAL_LABEL[v]}</button>`).join("") +
+    (o ? `<button class="btn btn-sub" style="grid-column:1/3;color:#b45309;" onclick="setWorkcalOverride('')">↩ 手で直したのを取り消す(登録した内容に戻す)</button>` : "");
+}
+window.setWorkcalOverride = async function(v){
+  const ds = workcalDay, c = workcalPeriodOf(ds); if (!c) return;
+  const base = (c.days || {})[ds] || "出勤";
+  // 登録した内容と同じにするなら、手直しは消す
+  const val = (!v || v === base) ? firebase.firestore.FieldValue.delete() : v;
+  try {
+    await db.collection(WORKCAL_COL).doc(c.id).update({ ["overrides." + ds]: val, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    toast("✅ " + ds.slice(5).replace("-","/") + " を " + WORKCAL_LABEL[v || base] + " にしました");
+  } catch(e){ console.error(e); toast("⚠️ 保存に失敗しました"); }
+};
+/* JSON(写真から作ったもの)を読み込む: { company, period:{start,end}, days:{日付:"全休"|"A"|"B"} } */
+window.importWorkcalFile = async function(input){
+  const f = input.files && input.files[0]; input.value = "";
+  if (!f) return;
+  let j;
+  try { j = JSON.parse(await f.text()); } catch(e){ toast("⚠️ JSONとして読めませんでした"); return; }
+  const isDate = s => /^\d{4}-\d{2}-\d{2}$/.test(s || "");
+  const start = j.period && j.period.start, end = j.period && j.period.end;
+  if (!isDate(start) || !isDate(end) || start > end){ toast("⚠️ period(start・end)が正しくありません"); return; }
+  const days = {}, bad = [];
+  Object.entries(j.days || {}).forEach(([ds, v]) => {
+    if (!isDate(ds) || ds < start || ds > end || !WORKCAL_SHORT[v]) bad.push(ds + ":" + v); else days[ds] = v;
+  });
+  if (bad.length){ alert("読み込めない日があります。JSONを直してください。\n\n" + bad.slice(0,20).join("\n")); return; }
+  const overlap = workCals.filter(c => c.id !== WORKCAL_OWNER + "_" + start && c.start <= end && start <= c.end);
+  if (overlap.length){ alert("ほかの期間と日付が重なっています(" + overlap.map(c => c.start + "〜" + c.end).join("、") + ")。先にそちらを削除してください。"); return; }
+  const id = WORKCAL_OWNER + "_" + start, exists = workCals.some(c => c.id === id);
+  const n = { "全休":0, A:0, B:0 }; Object.values(days).forEach(v => n[v]++);
+  if (!confirm((exists ? "【上書き】" : "") + start.replace(/-/g,"/") + " 〜 " + end.replace(/-/g,"/") + " を登録します。\n\n全休 " + n["全休"] + "日・A班休み " + n.A + "日・B班休み " + n.B + "日\n(記載のない日は出勤)" +
+    (exists ? "\n\n手で直した臨時休みはそのまま残ります。" : ""))) return;
+  try {
+    // days は丸ごと置きかえ、手で直した overrides は残す
+    const old = workCals.find(c => c.id === id);
+    await db.collection(WORKCAL_COL).doc(id).set({
+      owner: WORKCAL_OWNER, ownerName: WORKCAL_OWNER_NAME, start, end, days,
+      overrides: (old && old.overrides) || {},
+      note: String(j.note || ""), updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    openWorkcalMonth(start);
+    toast("✅ 就業カレンダーを登録しました");
+  } catch(e){ console.error(e); toast("⚠️ 登録できませんでした"); }
+};
+window.deleteWorkcal = async function(id){
+  const c = workCals.find(x => x.id === id); if (!c) return;
+  if (!confirm(c.start + " 〜 " + c.end + " の就業カレンダーを削除しますか?\n手で直した臨時休みも消えます。")) return;
+  try { await db.collection(WORKCAL_COL).doc(id).delete(); toast("🗑 削除しました"); }
+  catch(e){ console.error(e); toast("⚠️ 削除に失敗しました"); }
+};
 
 function toast(msg) {
   const t = document.getElementById("toast");
