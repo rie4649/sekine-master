@@ -304,6 +304,11 @@
     <div id="workcalMonthTitle" style="font-weight:700;font-size:16px;"></div>
     <button class="btn btn-sub" style="width:auto;padding:8px 14px;" onclick="workcalMove(1)">▶</button>
   </div>
+  <div style="display:flex;gap:8px;margin-bottom:8px;font-size:12px;font-weight:700;">
+    <span style="background:#fce4ec;border:2px solid #e57399;color:#c2185b;border-radius:6px;padding:2px 8px;">全休</span>
+    <span style="background:#e6f4c8;border:2px solid #8bc34a;color:#4d7c0f;border-radius:6px;padding:2px 8px;">A班休み</span>
+    <span style="background:#dbeafe;border:2px solid #5b9bd5;color:#1d4ed8;border-radius:6px;padding:2px 8px;">B班休み</span>
+  </div>
   <div style="font-size:12px;color:#64748b;margin-bottom:8px;">日付を押すと、臨時休みの追加・取り消しができます(登録した内容より優先されます)。<span style="color:#b45309;font-weight:700;">手</span> = 手で直した日</div>
   <div id="workcalGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;"></div>
 </div>
@@ -1995,8 +2000,11 @@ function closeLedgerImport(){
 const WORKCAL_COL = "workCalendars";
 const WORKCAL_OWNER = "sekine", WORKCAL_OWNER_NAME = "関根商店";
 const WORKCAL_LABEL = { "全休":"全休", A:"A班休み", B:"B班休み", "出勤":"出勤" };
-const WORKCAL_SHORT = { "全休":"全休", A:"A休", B:"B休" };
-const WORKCAL_COLOR = { "全休":"#dc2626", A:"#1976d2", B:"#2e7d32" };
+const WORKCAL_SHORT = { "全休":"全休", A:"A班休", B:"B班休" };
+/* 色は紙の就業カレンダーに合わせる: 全休=ピンク / A班=黄緑 / B班=水色 */
+const WORKCAL_COLOR = { "全休":"#c2185b", A:"#4d7c0f", B:"#1d4ed8" };
+const WORKCAL_BG    = { "全休":"#fce4ec", A:"#e6f4c8", B:"#dbeafe" };
+const WORKCAL_LINE  = { "全休":"#e57399", A:"#8bc34a", B:"#5b9bd5" };
 let workCals = [], workcalY = 0, workcalM = 0;
 function wcYmd(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
 function workcalPeriodOf(ds){ return workCals.find(c => c.start <= ds && ds <= c.end) || null; }
@@ -2030,7 +2038,7 @@ function renderWorkcal(){
     const ov = Object.keys(c.overrides || {}).length;
     return `<div style="border:1.5px solid #cbd5e1;border-radius:12px;padding:10px 12px;margin-bottom:8px;">
       <div style="font-weight:700;">${esc(c.start.replace(/-/g,"/"))} 〜 ${esc(c.end.replace(/-/g,"/"))}</div>
-      <div style="font-size:12px;color:#64748b;margin-top:2px;">全休 ${n["全休"]}日・A班休み ${n.A}日・B班休み ${n.B}日${ov ? "・手で直した日 " + ov + "日" : ""}</div>
+      <div style="font-size:12px;color:#64748b;margin-top:2px;"><span style="color:${WORKCAL_COLOR["全休"]};font-weight:700;">全休 ${n["全休"]}日</span>・<span style="color:${WORKCAL_COLOR.A};font-weight:700;">A班休み ${n.A}日</span>・<span style="color:${WORKCAL_COLOR.B};font-weight:700;">B班休み ${n.B}日</span>${ov ? "・手で直した日 " + ov + "日" : ""}</div>
       <div style="display:flex;gap:6px;margin-top:8px;">
         <button onclick="openWorkcalMonth('${c.start}')" style="border:none;background:#e0f2fe;color:#0369a1;border-radius:8px;padding:8px 12px;">📅 見る・直す</button>
         <button onclick="deleteWorkcal('${c.id}')" style="border:none;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:8px 12px;">🗑</button>
@@ -2060,7 +2068,7 @@ function renderWorkcalMonth(){
     const ds = wcYmd(new Date(workcalY, workcalM, d)), w = workDayOf(ds), c = workcalPeriodOf(ds);
     const manual = c && (c.overrides || {})[ds];
     const wd = new Date(workcalY, workcalM, d).getDay();
-    html += `<div onclick="openWorkcalDay('${ds}')" style="min-height:52px;border-radius:8px;padding:4px;cursor:pointer;background:${w === null ? "#f1f5f9" : w ? WORKCAL_COLOR[w] + "18" : "#fff"};border:1px solid #e2e8f0;">
+    html += `<div onclick="openWorkcalDay('${ds}')" style="min-height:52px;border-radius:8px;padding:4px;cursor:pointer;background:${w === null ? "#f1f5f9" : w ? WORKCAL_BG[w] : "#fff"};border:${w ? "2px solid " + WORKCAL_LINE[w] : "1px solid #e2e8f0"};">
       <div style="font-size:13px;font-weight:700;color:${wd===0?"#dc2626":wd===6?"#1d4ed8":"#1e293b"};">${d}${manual ? '<span style="color:#b45309;font-size:11px;margin-left:2px;">手</span>' : ""}</div>
       <div style="font-size:11px;font-weight:700;color:${w ? WORKCAL_COLOR[w] : "#94a3b8"};">${w === null ? "未登録" : w ? WORKCAL_SHORT[w] : ""}</div></div>`;
   }
