@@ -289,7 +289,13 @@
   <h2>📅 就業カレンダー(関根商店)</h2>
   <div style="font-size:13px;color:#64748b;margin-bottom:10px;">1年分(3/21〜翌3/20)をまとめて登録します。日付ごとに「全休」「A班休み」「B班休み」が入ります。記載のない日は出勤日です。配車ボード・関根カレンダー・ISO管理に表示されます。</div>
   <div id="workcalPeriods"></div>
-  <label class="btn btn-sub" style="text-align:center;margin-top:10px;">📥 JSONファイルから登録・上書き<input type="file" accept=".json,application/json" style="display:none;" onchange="importWorkcalFile(this)"></label>
+  <label class="btn btn-main" style="text-align:center;margin-top:10px;">📥 JSONファイルを選んで登録・上書き<input type="file" style="display:none;" onchange="importWorkcalFile(this)"></label>
+  <details style="margin-top:10px;">
+    <summary style="font-size:13px;color:#0d9488;font-weight:700;cursor:pointer;">ファイルが選べないとき(中身を貼り付けて登録)</summary>
+    <div style="font-size:12px;color:#64748b;margin:6px 0;">JSONファイルを開いて、中身を全部コピーしてここに貼り付けてください。</div>
+    <textarea id="workcalPaste" placeholder='{ "period": { "start": ... }, "days": { ... } }' style="min-height:120px;"></textarea>
+    <button class="btn btn-main" style="margin-top:8px;" onclick="importWorkcalText(document.getElementById('workcalPaste').value)">貼り付けた内容で登録</button>
+  </details>
 </div>
 <div class="section" id="workcalMonthBox" style="display:none;">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
@@ -2089,11 +2095,18 @@ window.setWorkcalOverride = async function(v){
   } catch(e){ console.error(e); toast("⚠️ 保存に失敗しました"); }
 };
 /* JSON(写真から作ったもの)を読み込む: { company, period:{start,end}, days:{日付:"全休"|"A"|"B"} } */
+/* iPhoneは accept=".json" だとファイルが灰色で選べないことがあるので、種類で絞らず中身で判断する */
 window.importWorkcalFile = async function(input){
   const f = input.files && input.files[0]; input.value = "";
   if (!f) return;
+  let text = "";
+  try { text = await f.text(); } catch(e){ alert("ファイルを読めませんでした。"); return; }
+  importWorkcalText(text);
+};
+window.importWorkcalText = async function(text){
   let j;
-  try { j = JSON.parse(await f.text()); } catch(e){ toast("⚠️ JSONとして読めませんでした"); return; }
+  try { j = JSON.parse(String(text || "").replace(/^\uFEFF/, "").trim()); }
+  catch(e){ alert("就業カレンダーのJSONとして読めませんでした。\nshugyo-calendar-2026.json を選んでいるか確認してください。"); return; }
   const isDate = s => /^\d{4}-\d{2}-\d{2}$/.test(s || "");
   const start = j.period && j.period.start, end = j.period && j.period.end;
   if (!isDate(start) || !isDate(end) || start > end){ toast("⚠️ period(start・end)が正しくありません"); return; }
@@ -2117,8 +2130,12 @@ window.importWorkcalFile = async function(input){
       note: String(j.note || ""), updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     openWorkcalMonth(start);
+    document.getElementById("workcalPaste").value = "";
     toast("✅ 就業カレンダーを登録しました");
-  } catch(e){ console.error(e); toast("⚠️ 登録できませんでした"); }
+  } catch(e){
+    console.error(e);
+    alert("登録できませんでした。\n" + (e.code === "permission-denied" ? "Firebaseのルールで workCalendars への保存が許可されていません。" : "通信を確認して、もう一度お試しください。") + "\n(" + (e.code || e.message) + ")");
+  }
 };
 window.deleteWorkcal = async function(id){
   const c = workCals.find(x => x.id === id); if (!c) return;
