@@ -256,32 +256,38 @@ const db = firebase.firestore();
 const DOC = db.collection("renkeiMap").doc("main");
 
 /* ---------- 初期データ（初回だけ自動登録） ---------- */
+const SEED_VER = 2;   // 中身を作り直したら数字を上げる → 開いたときに1回だけ新しい内容に入れ替わる(前の内容は renkeiMap/backup_v番号 に控え)
 const SEED = {
   masters: [
-    { name:"車両", sub:"車両マスタ", apps:["点検ラクラク","タイヤ管理","機械作業","業務管理","ISO管理"] },
-    { name:"従業員", sub:"従業員マスタ", apps:["点検ラクラク","配車ボード","業務管理","引取先管理"] },
-    { name:"取引先", sub:"取引先マスタ", apps:["点検ラクラク","配車ボード","引取先管理"] },
-    { name:"許可証PDF", sub:"許可証の保管", apps:["ISO管理（許可一覧）"] }
+    { name:"車両", sub:"車両マスタ（愛称・車番・車検日・車両の情報）", apps:["点検ラクラク（車両リスト・車検日・QR印刷）","タイヤ管理","機械作業","業務管理（車両台帳の表示）","ISO管理（車両の一覧・主な設備・写真の車両）"] },
+    { name:"従業員", sub:"従業員マスタ（名前・並び順）", apps:["点検ラクラク（担当者）","配車ボード（作業員）","業務管理（資格管理）","引取先管理（担当者）","ISO管理（力量・従業員数）"] },
+    { name:"取引先", sub:"取引先マスタ（会社名・よみがな・住所・電話）", apps:["点検ラクラク（取引先情報・ルート）","配車ボード（引用・まとめて取り込み）","引取先管理（住所・電話の補完）","電話依頼（関根カレンダーの予定・マスタ登録）"] },
+    { name:"契約", sub:"契約マスタ（排出事業者×処分先・品名）", apps:["点検ラクラク（契約タブ）","引取先管理（契約の表示・引用・取り込み）","ISO管理（委託・契約の集計）"] },
+    { name:"許可証PDF", sub:"許可証の保管（📜許可証）", apps:["ISO管理（許可一覧）"] },
+    { name:"車両の選択肢", sub:"メーカー・車体の形状・保険会社", apps:["業務管理（車両台帳の選択肢）"] }
   ],
   external: [
-    { app:"単価管理", sub:"", arrow:"←", tag:"自動", target:"鐘栄商店", targetSub:"銅建値・黄銅ダライ粉価格", note:"※花村産業BS粉 ＝ 黄銅ダライ粉 −70円で自動計算" },
-    { app:"単価管理", sub:"", arrow:"←", tag:"自動", target:"東京製鐵", targetSub:"国内鉄スクラップ購入価格表", note:"※千曲通信 ＝ 東京製鐵 田原・新断 ＋2円" },
-    { app:"ISO管理", sub:"法規制一覧", arrow:"←", tag:"自動", target:"e-Gov", targetSub:"法令情報を自動取得", note:"" },
+    { app:"単価管理", sub:"相場", arrow:"←", tag:"自動", target:"鐘栄商店", targetSub:"電気銅建値・黄銅ダライ粉", note:"平日の9〜18時に毎時取得。花村産業BS粉 ＝ 黄銅ダライ粉 −70円で自動計算" },
+    { app:"単価管理", sub:"相場", arrow:"←", tag:"自動", target:"東京製鐵", targetSub:"鉄スクラップ購入価格（宇都宮・田原）", note:"千曲通信 ＝ 田原・新断 ＋2円" },
+    { app:"ISO管理", sub:"法規制一覧", arrow:"←", tag:"自動", target:"e-Gov", targetSub:"法令情報", note:"" },
+    { app:"社内掲示板", sub:"", arrow:"←", tag:"自動", target:"天気・今日は何の日", targetSub:"上田市の天気・Wikipedia", note:"" },
     { app:"ISO管理", sub:"", arrow:"→", tag:"web", target:"SDGsポータル", targetSub:"NAGANO SDGs BUSINESS PORTAL", note:"" },
-    { app:"ISO管理", sub:"", arrow:"→", tag:"web", target:"さんぱいくん", targetSub:"産廃情報ネット", note:"" }
+    { app:"ISO管理", sub:"許可一覧", arrow:"→", tag:"web", target:"さんぱいくん", targetSub:"産廃情報ネット", note:"" }
   ],
   applinks: [
-    { app:"ISO管理", sub:"月次カレンダー", arrow:"⇔", tag:"連動", target:"社内掲示板", targetSub:"", note:"" },
+    { app:"業務管理", sub:"許可証管理（有効期限）", arrow:"→", tag:"連動", target:"ISO管理", targetSub:"許可一覧・ホームの期限", note:"期限は業務管理だけで入れる。許可証PDFの日付と違うとISO管理で⚠️" },
+    { app:"点検ラクラク", sub:"日常点検・午前午後の点検確認・不具合報告", arrow:"→", tag:"連動", target:"ISO管理", targetSub:"車両点検の実績・年間サマリー", note:"月ごとに自動で数える（アルコールチェックは別の記録のため入らない）" },
+    { app:"電話依頼", sub:"依頼・対応の記録", arrow:"→", tag:"連動", target:"ISO管理", targetSub:"顧客対応の進捗・苦情", note:"苦情かもしれない依頼を見つけて、押すだけで苦情の表に入る" },
     { app:"ISO管理", sub:"環境手順書", arrow:"→", tag:"連動", target:"点検ラクラク", targetSub:"QRページから閲覧", note:"" },
-    { app:"機械作業", sub:"", arrow:"⇔", tag:"連動", target:"配車ボード", targetSub:"", note:"" },
-    { app:"マスター管理", sub:"スクリーンセイバー", arrow:"→", tag:"巡回表示", target:"電話依頼・社内掲示板", targetSub:"", note:"" }
+    { app:"ISO管理", sub:"カレンダー", arrow:"⇔", tag:"連動", target:"社内掲示板", targetSub:"", note:"" },
+    { app:"機械作業", sub:"", arrow:"→", tag:"連動", target:"配車ボード", targetSub:"自動で書き写し", note:"" },
+    { app:"マスター管理", sub:"スクリーンセイバー", arrow:"→", tag:"巡回表示", target:"社内掲示板・無事故無違反・外注スケジュール・電話依頼", targetSub:"", note:"夜（19時〜6時）は時計だけ" }
   ],
   standalone: [
     { name:"取引確認書", note:"" },
-    { name:"単価管理", note:"社内では単独・相場サイトのみ連動" },
-    { name:"電話依頼", note:"" },
     { name:"外注スケジュール", note:"" },
-    { name:"無事故無違反", note:"" }
+    { name:"無事故無違反", note:"記録は端末ごと" },
+    { name:"関根新聞", note:"" }
   ]
 };
 
@@ -355,8 +361,16 @@ async function load() {
     const snap = await DOC.get();
     if (snap.exists) {
       state = snap.data();
+      /* 作り直し：前の版の内容なら、控えを残してから新しい内容に入れ替える(アドレスはそのまま) */
+      if ((state.seedVer || 1) < SEED_VER) {
+        const old = state.seedVer || 1;
+        await db.collection("renkeiMap").doc("backup_v" + old).set({ ...state, savedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        state = { ...JSON.parse(JSON.stringify(SEED)), urls: state.urls || {}, seedVer: SEED_VER };
+        await DOC.set({ ...state, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        toast("連動一覧を最新の内容に作り直しました");
+      }
     } else {
-      state = JSON.parse(JSON.stringify(SEED));
+      state = { ...JSON.parse(JSON.stringify(SEED)), seedVer: SEED_VER };
       await DOC.set({ ...state, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
       toast("初期データを登録しました");
     }
