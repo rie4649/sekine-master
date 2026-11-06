@@ -1,0 +1,2202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1e293b">
+<title>マスタ管理</title>
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif; background:#f1f5f9; color:#1e293b; padding-bottom:80px; }
+  header { background:linear-gradient(135deg,#1e293b,#334155); color:#fff; padding:16px; position:sticky; top:0; z-index:50; }
+  header h1 { font-size:20px; display:flex; align-items:center; gap:8px; }
+  header .sub { font-size:11px; opacity:.7; margin-top:2px; letter-spacing:1px; }
+  .tab-bar { display:flex; gap:8px; margin-top:12px; overflow-x:auto; }
+  .tab-btn { flex:1; white-space:nowrap; padding:10px; border:none; border-radius:10px; background:rgba(255,255,255,.12); color:#cbd5e1; font-size:14px; font-weight:700; }
+  .tab-btn.active { background:#0d9488; color:#fff; }
+  #installBtn { position:absolute; top:14px; right:14px; padding:8px 12px; border:none; border-radius:10px; background:#0d9488; color:#fff; font-size:13px; font-weight:700; display:none; }
+  .summary { display:flex; gap:10px; padding:12px 16px; }
+  .sum-card { flex:1; background:#fff; border-radius:14px; padding:12px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .sum-card .num { font-size:26px; font-weight:700; }
+  .sum-card .label { font-size:11px; color:#64748b; margin-top:2px; }
+  .sum-card.warn .num { color:#dc2626; }
+  .section { background:#fff; margin:10px 12px; border-radius:16px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .section h2 { font-size:15px; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+  .row { display:flex; gap:8px; margin-bottom:8px; }
+  input[type=text], input[type=date], textarea, select {
+    width:100%; padding:11px 12px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:16px; background:#fff;
+  }
+  input:focus, textarea:focus { outline:none; border-color:#0d9488; }
+  textarea { min-height:110px; font-size:14px; }
+  .btn { display:block; width:100%; padding:13px; border:none; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; }
+  .btn-main { background:#0d9488; color:#fff; }
+  .btn-sub { background:#e2e8f0; color:#334155; }
+  /* ルート作成 */
+  #routeModeBtn { display:block; margin:0 12px 10px; width:calc(100% - 24px); padding:11px; border:none; border-radius:12px; background:#fff; color:#0d9488; font-size:14px; font-weight:700; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  #routeModeBtn.on { background:#0d9488; color:#fff; }
+  .v-card.route-sel { border:2px solid #0d9488; background:#f0fdfa; }
+  .route-badge { min-width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:700; background:#f1f5f9; color:#94a3b8; }
+  .route-badge.num { background:#0d9488; color:#fff; }
+  #routeBar { display:none; position:fixed; left:0; right:0; bottom:0; background:#fff; box-shadow:0 -2px 12px rgba(0,0,0,.15); padding:12px 14px 20px; z-index:90; border-radius:16px 16px 0 0; }
+  #routeBar.show { display:block; }
+  .rb-row1 { display:flex; align-items:center; gap:10px; font-size:13px; font-weight:700; margin-bottom:8px; }
+  .rb-count { color:#0d9488; }
+  .rb-round { margin-left:auto; font-size:13px; font-weight:600; color:#475569; display:flex; align-items:center; gap:4px; }
+  .rb-origin { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .rb-origin label { font-size:12px; color:#64748b; font-weight:600; white-space:nowrap; }
+  .rb-origin input { flex:1; padding:9px 10px; font-size:14px; min-width:0; }
+  .rb-home { border:none; border-radius:10px; background:#e2e8f0; color:#334155; font-size:12px; font-weight:700; padding:9px 10px; white-space:nowrap; }
+  .rb-btns { display:flex; gap:8px; }
+  .rb-btns .btn { padding:12px; font-size:14px; }
+  body.route-open { padding-bottom:210px; }
+  .btn-danger { background:#fee2e2; color:#dc2626; }
+  .btn:active { opacity:.8; }
+  .hint { font-size:12px; color:#64748b; margin-top:6px; line-height:1.5; }
+  .toggle-head { display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
+  .toggle-head .arrow { transition:.2s; }
+  .toggle-head.open .arrow { transform:rotate(180deg); }
+  .toggle-body { display:none; margin-top:12px; }
+  .toggle-body.show { display:block; }
+  .search-bar { margin:0 12px; }
+  .search-bar input { border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.06); border:none; }
+  .sort-row { display:flex; gap:8px; margin:10px 12px 0; }
+  .sort-btn { flex:1; padding:9px; border:none; border-radius:10px; background:#e2e8f0; color:#475569; font-size:13px; font-weight:600; }
+  .sort-btn.active { background:#1e293b; color:#fff; }
+  .v-card { background:#fff; margin:8px 12px; border-radius:14px; padding:12px 14px; box-shadow:0 1px 4px rgba(0,0,0,.06); display:flex; align-items:center; gap:12px; }
+  .v-info { flex:1; min-width:0; }
+  .v-number { font-size:17px; font-weight:700; }
+  .v-model { font-size:13px; color:#64748b; margin-top:1px; }
+  .v-shaken { text-align:right; }
+  .badge { display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; }
+  .badge.ok { background:#f1f5f9; color:#475569; }
+  .badge.soon { background:#fef3c7; color:#b45309; }
+  .badge.urgent { background:#fee2e2; color:#dc2626; }
+  .badge.expired { background:#dc2626; color:#fff; }
+  .v-days { font-size:11px; color:#94a3b8; margin-top:3px; }
+  .v-edit { border:none; background:#f1f5f9; border-radius:10px; padding:10px 12px; font-size:14px; }
+  .empty { text-align:center; color:#94a3b8; padding:40px 20px; font-size:14px; }
+  /* モーダル */
+  .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:100; align-items:flex-end; }
+  .modal-bg.show { display:flex; }
+  .modal { background:#fff; width:100%; border-radius:20px 20px 0 0; padding:20px 16px 30px; max-height:85vh; overflow-y:auto; }
+  .modal h3 { font-size:16px; margin-bottom:14px; }
+  .modal .field { margin-bottom:12px; }
+  .modal .field label { font-size:12px; color:#64748b; display:block; margin-bottom:4px; font-weight:600; }
+  .modal-btns { display:flex; gap:8px; margin-top:16px; }
+  /* トースト */
+  #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:#1e293b; color:#fff; padding:12px 22px; border-radius:999px; font-size:14px; opacity:0; pointer-events:none; transition:.25s; z-index:200; white-space:nowrap; }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🗂 マスタ管理</h1>
+  <div class="sub">SEKINE MASTER</div>
+  <button id="installBtn" onclick="installApp()">📲 追加</button>
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tabBtnVehicles" onclick="switchTab('vehicles')">🚚 車両</button>
+    <button class="tab-btn" id="tabBtnClients" onclick="switchTab('clients')">🏢 取引先</button>
+    <button class="tab-btn" id="tabBtnContracts" onclick="switchTab('contracts')">📋 契約</button>
+    <button class="tab-btn" id="tabBtnStaff" onclick="switchTab('staff')">👤 従業員</button>
+    <button class="tab-btn" id="tabBtnWorkcal" onclick="switchTab('workcal')">📅 就業日</button>
+    <button class="tab-btn" onclick="location.href='kyoka.html'">📜 許可証</button>
+  <button class="tab-btn" onclick="location.href='renkei.html'">🔗 連動</button> 
+  </div>
+</header>
+<div id="workcalWarn" style="display:none;margin:10px 12px 0;padding:12px 14px;border-radius:12px;background:#fef2f2;border:1.5px solid #fca5a5;color:#b91c1c;font-size:14px;font-weight:700;" onclick="switchTab('workcal')"></div>
+
+<div id="tabVehicles">
+
+<div class="summary">
+  <div class="sum-card"><div class="num" id="sumTotal">0</div><div class="label">登録台数</div></div>
+  <div class="sum-card warn"><div class="num" id="sumUrgent">0</div><div class="label">車検30日以内</div></div>
+  <div class="sum-card"><div class="num" id="sumSoon">0</div><div class="label">車検60日以内</div></div>
+</div>
+
+<!-- 新規登録 -->
+<div class="section">
+  <h2>➕ 車両を登録</h2>
+  <div class="row">
+    <input type="text" id="addNickname" placeholder="愛称【メイン】(各アプリの表示名 例:340・低クレ)">
+  </div>
+  <div class="row">
+    <input type="text" id="addNumber" placeholder="車番(例:長野100す8618)">
+  </div>
+  <div class="row" style="font-size:11px;color:#94a3b8;margin-top:-4px;">※愛称か車番のどちらかは必ず入れてください(両方あるのがおすすめ)</div>
+  <div class="row">
+    <select id="addModel"><option value="">車種(車体の形状から選択)</option></select>
+  </div>
+  <div class="row" style="display:flex;gap:8px;">
+    <input type="month" id="addFirstReg" title="初年度登録" style="flex:1;">
+    <input type="text" id="addKatashiki" placeholder="型式(例:2PG-FEB90)" style="flex:1;">
+  </div>
+  <div class="row" style="display:flex;gap:8px;">
+    <select id="addMaker" style="flex:1;"><option value="">メーカー</option></select>
+    <input type="text" id="addHaikiryo" placeholder="総排気量/定格出力(例:2.99)" style="flex:1;">
+  </div>
+  <div class="row" style="display:flex;gap:8px;">
+    <input type="text" id="addMaxLoad" placeholder="最大積載量kg" inputmode="numeric" style="flex:1;">
+    <input type="text" id="addWeight" placeholder="車両重量kg" inputmode="numeric" style="flex:1;">
+    <input type="text" id="addTotalWeight" placeholder="車両総重量kg" inputmode="numeric" style="flex:1;">
+  </div>
+  <div class="row" style="display:flex;gap:8px;">
+    <input type="text" id="addLength" placeholder="長さcm" inputmode="numeric" style="flex:1;">
+    <input type="text" id="addWidth" placeholder="幅cm" inputmode="numeric" style="flex:1;">
+    <input type="text" id="addHeight" placeholder="高さcm" inputmode="numeric" style="flex:1;">
+  </div>
+  <div class="row" style="font-size:11px;color:#94a3b8;margin-top:-4px;">※長さ・幅・高さは車検証(電子車検証は「自動車検査証記録事項」)のcmの数字をそのまま入れてください。トラック置き場の配置図で使います</div>
+  <div class="row" style="display:flex;gap:8px;">
+    <select id="addInsurer" style="flex:1;"><option value="">保険会社</option></select>
+    <input type="text" id="addInsurerMemo" placeholder="保険メモ(担当者など)" style="flex:1;">
+  </div>
+  <div class="row" style="font-size:11px;color:#94a3b8;">※車種・メーカー・保険会社の選択肢は、すぐ下の「⚙️車両の選択肢マスタ」で増やせます</div>
+  <div class="row">
+    <input type="date" id="addShaken">
+  </div>
+  <button class="btn btn-main" onclick="addVehicle()">登録</button>
+  <div class="hint">車検満了日は空欄でも登録できます(あとから編集可)</div>
+</div>
+
+<div class="section" style="margin-top:4px;">
+  <details>
+    <summary style="font-size:15px;font-weight:bold;color:#0d9488;padding:6px 0;cursor:pointer;">⚙️ 車両の選択肢マスタ(メーカー・車体の形状・保険会社)</summary>
+    <div style="font-size:12px;color:#64748b;margin-top:4px;">ここで編集した選択肢は、マスタ管理と業務管理の両方で使われます(編集はここだけ)</div>
+    <div id="optionMaster"></div>
+  </details>
+</div>
+
+<!-- 業務管理の台帳から取り込み -->
+<div class="section" style="margin-top:4px;">
+  <h2 style="margin-bottom:6px;">📥 業務管理の台帳から取り込む</h2>
+  <div style="font-size:12px;color:#64748b;line-height:1.6;margin-bottom:10px;">
+    業務管理の車両台帳の詳しい情報(初年度登録・型式・メーカー・排気量・重量・保険会社・車種)を、車番で照合してこのマスタへ取り込みます。<br>
+    空いている項目は自動で埋め、<b>両方に値があって違う項目</b>はどちらを残すか選べます。何度開いても安全です(そろっていれば「食い違いなし」と出ます)。
+  </div>
+  <button class="btn btn-main" onclick="openLedgerImport()">📥 台帳と見くらべる</button>
+</div>
+
+<!-- 一括登録 -->
+<div class="section">
+  <div class="toggle-head" id="bulkHead" onclick="toggleBulk()">
+    <h2 style="margin:0">📋 一括登録(まとめて追加)</h2>
+    <span class="arrow">▼</span>
+  </div>
+  <div class="toggle-body" id="bulkBody">
+    <textarea id="bulkText" placeholder="1行に1台ずつ入力してください&#10;車番,車種,車検満了日&#10;&#10;例:&#10;上田100あ1234,大型ダンプ,2026/12/15&#10;上田100か5678,アームロール,2027/3/1&#10;上田800さ9012,軽トラック"></textarea>
+    <div class="hint" style="margin-bottom:10px">「車番,車種,車検満了日」の順でカンマ区切り。車検満了日は省略OK(2026/12/15・2026-12-15どちらの形式でも読み取ります)</div>
+    <button class="btn btn-main" onclick="bulkAdd()">一括登録する</button>
+  </div>
+</div>
+
+<!-- 検索・並び替え -->
+<div class="search-bar">
+  <input type="text" id="searchBox" placeholder="🔍 愛称・車番・車種で検索" oninput="render()">
+</div>
+<div class="sort-row">
+  <button class="sort-btn active" id="sortShaken" onclick="setSort('shaken')">車検が近い順</button>
+  <button class="sort-btn" id="sortNumber" onclick="setSort('number')">愛称順</button>
+</div>
+
+<!-- 車両一覧 -->
+<div id="vehicleList"></div>
+
+</div><!-- /tabVehicles -->
+
+<!-- ============ 取引先タブ ============ -->
+<div id="tabClients" style="display:none;">
+
+<div class="summary">
+  <div class="sum-card"><div class="num" id="sumClients">0</div><div class="label">登録社数</div></div>
+</div>
+
+<div class="search-bar" style="margin-bottom:8px;">
+  <input type="text" id="clientSearchBox" placeholder="🔍 会社名・よみがな・電話で検索" oninput="renderClients()">
+</div>
+<div id="kanaIndex" style="display:flex;flex-wrap:wrap;gap:6px;margin:0 12px 10px;"></div>
+
+<button id="routeModeBtn" onclick="toggleRouteMode()">🗺 運搬ルート作成(回る順に取引先を選ぶ)</button>
+<button id="similarBtn" onclick="openSimilarList()" style="display:block;margin:0 12px 10px;width:calc(100% - 24px);padding:11px;border:none;border-radius:12px;background:#fff;color:#b45309;font-size:14px;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.08);cursor:pointer;">🔍 似た名前を探す(ダブった取引先をまとめる)</button>
+
+<div class="section">
+  <h2>➕ 取引先を登録</h2>
+  <div class="row">
+    <input type="text" id="addClientName" placeholder="会社名(例:ミマキプレシジョン)">
+  </div>
+  <div class="row">
+    <input type="text" id="addClientYomi" placeholder="よみがな(例:みまきぷれしじょん)">
+  </div>
+  <div class="row">
+    <input type="text" id="addClientAddress" placeholder="住所(任意)">
+  </div>
+  <div class="row">
+    <input type="text" id="addClientTel" placeholder="電話番号(任意)">
+  </div>
+  <div class="row">
+    <input type="text" id="addClientNote" placeholder="メモ(任意。例:引取先/持込など)">
+  </div>
+  <button class="btn btn-main" onclick="addClient()">登録</button>
+</div>
+
+<div class="section">
+  <div class="toggle-head" id="clientBulkHead" onclick="toggleClientBulk()">
+    <h2 style="margin:0">📋 一括登録(まとめて追加)</h2>
+    <span class="arrow">▼</span>
+  </div>
+  <div class="toggle-body" id="clientBulkBody">
+    <textarea id="clientBulkText" placeholder="1行に1社ずつ入力してください&#10;「会社名,よみがな,住所,電話番号,メモ」の形式(会社名以外は省略可)&#10;&#10;例:&#10;㈱ミマキプレシジョン,みまきぷれしじょん,東御市滋野乙2182-3,0268-64-6066"></textarea>
+    <div class="hint" style="margin-bottom:10px">「会社名,よみがな,住所,電話番号,メモ」の形式(会社名以外は省略可)。すでに登録済みの会社名は、入力された項目だけ上書き更新されます(二重登録にはなりません)</div>
+    <button class="btn btn-main" onclick="clientBulkAdd()">一括登録する</button>
+  </div>
+</div>
+
+<div id="clientList"></div>
+
+</div><!-- /tabClients -->
+
+<!-- ============ 契約タブ ============ -->
+<div id="tabContracts" style="display:none;">
+<div class="section">
+  <h2>📋 契約一覧（処分先ごと → 品名ごと）</h2>
+  <input type="text" id="contractSearchBox" placeholder="🔍 会社名・処分先・品目・シート名で検索" oninput="renderContracts()" style="width:100%;padding:10px;border:1px solid #d9d9e3;border-radius:10px;font-size:14px;box-sizing:border-box;">
+  <div id="contractSummary" style="font-size:12px;color:#64748b;margin:8px 0;"></div>
+  <div style="font-size:11px;color:#0d9488;font-weight:700;margin-top:6px;">🏭 処分先</div>
+  <div id="contractDispChips" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;"></div>
+  <div id="contractSheetWrap" style="display:none;"><div style="font-size:11px;color:#b45309;font-weight:700;">📦 品名（シート）</div>
+  <div id="contractSheetChips" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;"></div></div>
+  <div id="contractKanaChips" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;"></div>
+  <button class="btn btn-sub" style="width:100%;margin-bottom:10px;" onclick="addContractManually()">＋ 契約を追加</button>
+  <div id="contractList"><div style="text-align:center;color:#94a3b8;padding:20px;">読み込み中...</div></div>
+</div>
+</div><!-- /tabContracts -->
+
+<div id="tabStaff" style="display:none;">
+<div class="section">
+  <h2>👤 従業員(全アプリ共通)</h2>
+  <div style="font-size:13px;color:#64748b;margin-bottom:10px;">ここで登録・並べ替えした従業員が、点検ラクラクの担当者・業務管理の従業員・引取先管理の担当者(社内)に反映されます。並び順もそのまま使われます。</div>
+  <div class="row" style="display:flex;gap:8px;">
+    <input type="text" id="addStaffName" placeholder="従業員名(例:関根太郎)" style="flex:1;">
+    <button class="btn btn-main" style="width:auto;padding:10px 18px;" onclick="addStaffMember()">追加</button>
+  </div>
+</div>
+<div class="section" id="teamCopyBox" style="display:none;">
+  <h2>🔁 配車ボードの班を写す(1回だけ)</h2>
+  <div style="font-size:13px;color:#64748b;margin-bottom:10px;">これまで配車ボードの設定で決めていた班(A班/B班/Free)を、ここの従業員にそのまま写します。写したあとは、班はこの画面でだけ変えられます(配車ボードは見るだけになります)。</div>
+  <button class="btn btn-main" id="teamCopyBtn" onclick="copyTeamsFromBoard()">配車ボードの班を写す</button>
+</div>
+<div id="staffListWrap" style="padding:0 12px;"></div>
+</div>
+
+<div id="tabWorkcal" style="display:none;">
+<div class="section">
+  <h2>📅 就業カレンダー(関根商店)</h2>
+  <div style="font-size:13px;color:#64748b;margin-bottom:10px;">1年分(3/21〜翌3/20)をまとめて登録します。日付ごとに「全休」「A班休み」「B班休み」が入ります。記載のない日は出勤日です。配車ボード・関根カレンダー・ISO管理に表示されます。</div>
+  <div id="workcalPeriods"></div>
+  <button class="btn btn-main" style="margin-top:10px;background:#dc2626;" onclick="importWorkcalBuiltin()">📅 2026/3/21〜2027/3/20 を登録(ボタン1つで)</button>
+  <label class="btn btn-sub" style="text-align:center;margin-top:10px;">📥 JSONファイルを選んで登録・上書き<input type="file" style="display:none;" onchange="importWorkcalFile(this)"></label>
+  <details style="margin-top:10px;">
+    <summary style="font-size:13px;color:#0d9488;font-weight:700;cursor:pointer;">ファイルが選べないとき(中身を貼り付けて登録)</summary>
+    <div style="font-size:12px;color:#64748b;margin:6px 0;">JSONファイルを開いて、中身を全部コピーしてここに貼り付けてください。</div>
+    <textarea id="workcalPaste" placeholder='{ "period": { "start": ... }, "days": { ... } }' style="min-height:120px;"></textarea>
+    <button class="btn btn-main" style="margin-top:8px;" onclick="importWorkcalText(document.getElementById('workcalPaste').value)">貼り付けた内容で登録</button>
+  </details>
+</div>
+<div class="section" id="workcalMonthBox" style="display:none;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <button class="btn btn-sub" style="width:auto;padding:8px 14px;" onclick="workcalMove(-1)">◀</button>
+    <div id="workcalMonthTitle" style="font-weight:700;font-size:16px;"></div>
+    <button class="btn btn-sub" style="width:auto;padding:8px 14px;" onclick="workcalMove(1)">▶</button>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:8px;font-size:12px;font-weight:700;">
+    <span style="background:#fce4ec;border:2px solid #e57399;color:#c2185b;border-radius:6px;padding:2px 8px;">全休</span>
+    <span style="background:#e6f4c8;border:2px solid #8bc34a;color:#4d7c0f;border-radius:6px;padding:2px 8px;">A班休み</span>
+    <span style="background:#dbeafe;border:2px solid #5b9bd5;color:#1d4ed8;border-radius:6px;padding:2px 8px;">B班休み</span>
+  </div>
+  <div style="font-size:12px;color:#64748b;margin-bottom:8px;">日付を押すと、臨時休みの追加・取り消しができます(登録した内容より優先されます)。<span style="color:#b45309;font-weight:700;">手</span> = 手で直した日</div>
+  <div id="workcalGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;"></div>
+</div>
+</div>
+
+<!-- 就業カレンダー 1日の変更 -->
+<div class="modal-bg" id="workcalDayBg" onclick="if(event.target===this)closeWorkcalDay()">
+  <div class="modal">
+    <h3 id="workcalDayTitle"></h3>
+    <div id="workcalDayInfo" style="font-size:13px;color:#64748b;margin-bottom:12px;"></div>
+    <div id="workcalDayBtns" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+    <button class="btn btn-sub" style="margin-top:14px;" onclick="closeWorkcalDay()">閉じる</button>
+  </div>
+</div>
+
+<!-- 契約 編集モーダル -->
+<div class="modal-bg" id="contractEditBg" style="align-items:center;padding:16px;" onclick="if(event.target===this)closeContractEdit()">
+  <div class="modal" style="border-radius:20px;">
+    <h3>✏️ 契約を編集</h3>
+    <input type="hidden" id="ceId">
+    <div class="field"><label>会社名（排出事業者）</label><input type="text" id="ceCompany"></div>
+    <div class="field"><label>シート（品目カテゴリ）</label><input type="text" id="ceSheet"></div>
+    <div class="field"><label>処分先</label><input type="text" id="ceDisposer"></div>
+    <div class="field"><label>品名</label><input type="text" id="ceItem"></div>
+    <div class="field"><label>契約日・内容（〇＝日付不明）</label><input type="text" id="ceContent"></div>
+    <div class="field"><label>備考</label><input type="text" id="ceNote"></div>
+    <div class="modal-btns">
+      <button class="btn btn-sub" onclick="closeContractEdit()">キャンセル</button>
+      <button class="btn btn-main" onclick="saveContractEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- 取引先編集モーダル -->
+<div class="modal-bg" id="clientModalBg" onclick="if(event.target===this)closeClientEdit()">
+  <div class="modal">
+    <h3>✏️ 取引先を編集</h3>
+    <div class="field"><label>会社名</label><input type="text" id="editClientName"></div>
+    <div class="field"><label>よみがな</label><input type="text" id="editClientYomi"></div>
+    <div class="field"><label>住所</label><input type="text" id="editClientAddress"></div>
+    <div class="field"><label>電話番号</label><input type="text" id="editClientTel"></div>
+    <div class="field"><label>メモ</label><input type="text" id="editClientNote"></div>
+    <div class="modal-btns">
+      <button class="btn btn-sub" onclick="closeClientEdit()">キャンセル</button>
+      <button class="btn btn-main" onclick="saveClientEdit()">保存</button>
+    </div>
+    <button class="btn btn-sub" style="margin-top:10px" onclick="openMergePick()">🔗 別の取引先にまとめる(表記ゆれの統合)</button>
+    <button class="btn btn-danger" style="margin-top:10px" onclick="deleteClient()">🗑 この取引先を削除</button>
+  </div>
+</div>
+
+<!-- 取引先の統合モーダル -->
+<div class="modal-bg" id="mergeModalBg" onclick="if(event.target===this)closeMerge()">
+  <div class="modal">
+    <h3 id="mergeTitle">🔗 取引先をまとめる</h3>
+    <div id="mergeBody"></div>
+    <div class="modal-btns"><button class="btn btn-sub" onclick="closeMerge()">閉じる</button></div>
+  </div>
+</div>
+
+<!-- 編集モーダル -->
+<div class="modal-bg" id="editModalBg" onclick="if(event.target===this)closeEdit()">
+  <div class="modal">
+    <h3>✏️ 車両を編集</h3>
+    <div class="field"><label>愛称【メイン】(各アプリの表示名)</label><input type="text" id="editNickname"></div>
+    <div class="field"><label>車番</label><input type="text" id="editNumber" placeholder="例:長野100す8618"></div>
+    <div class="field"><label>車種(車体の形状から選択)</label><select id="editModel"><option value="">未選択</option></select></div>
+    <div class="field"><label>初年度登録</label><input type="month" id="editFirstReg"></div>
+    <div class="field"><label>型式</label><input type="text" id="editKatashiki"></div>
+    <div class="field"><label>メーカー</label><select id="editMaker"><option value="">未選択</option></select></div>
+    <div class="field"><label>総排気量/定格出力</label><input type="text" id="editHaikiryo"></div>
+    <div class="field"><label>最大積載量(kg)</label><input type="text" id="editMaxLoad" inputmode="numeric"></div>
+    <div class="field"><label>車両重量(kg)</label><input type="text" id="editWeight" inputmode="numeric"></div>
+    <div class="field"><label>車両総重量(kg)</label><input type="text" id="editTotalWeight" inputmode="numeric"></div>
+    <div class="field"><label>長さ・幅・高さ(cm)　※車検証の数字</label><div style="display:flex;gap:6px;"><input type="text" id="editLength" placeholder="長さ" inputmode="numeric" style="flex:1;min-width:0;"><input type="text" id="editWidth" placeholder="幅" inputmode="numeric" style="flex:1;min-width:0;"><input type="text" id="editHeight" placeholder="高さ" inputmode="numeric" style="flex:1;min-width:0;"></div></div>
+    <div class="field"><label>保険会社</label><select id="editInsurer"><option value="">未選択</option></select></div>
+    <div class="field"><label>保険メモ(担当者など)</label><input type="text" id="editInsurerMemo"></div>
+    <div class="field"><label>車検満了日</label><input type="date" id="editShaken"></div>
+    <div class="modal-btns">
+      <button class="btn btn-sub" onclick="closeEdit()">キャンセル</button>
+      <button class="btn btn-main" onclick="saveEdit()">保存</button>
+    </div>
+    <button class="btn btn-danger" style="margin-top:10px" onclick="deleteVehicle()">🗑 この車両を削除</button>
+  </div>
+</div>
+
+<!-- 台帳取り込みモーダル -->
+<div class="modal-bg" id="importModalBg" onclick="if(event.target===this)closeLedgerImport()">
+  <div class="modal">
+    <h3>📥 業務管理の台帳と見くらべ</h3>
+    <div id="importBody" style="font-size:14px;">読み込み中…</div>
+    <div class="modal-btns">
+      <button class="btn btn-sub" onclick="closeLedgerImport()">閉じる</button>
+      <button class="btn btn-main" id="importRunBtn" onclick="runLedgerImport()" style="display:none;">この内容で取り込む</button>
+    </div>
+  </div>
+</div>
+
+<!-- ルート作成バー -->
+<div id="routeBar">
+  <div class="rb-row1">
+    🗺 ルート作成中　<span class="rb-count" id="rbCount">0件選択</span>
+    <label class="rb-round"><input type="checkbox" id="rbRound">会社に戻る(往復)</label>
+  </div>
+  <div class="rb-origin">
+    <label>出発地</label>
+    <input type="text" id="rbOrigin" placeholder="例:長野県上田市○○1234" onchange="saveRouteOrigin()">
+    <button class="rb-home" onclick="resetRouteOrigin()">🏠 会社に戻す</button>
+  </div>
+  <div class="rb-btns">
+    <button class="btn btn-main" style="flex:2" onclick="openRouteMap()">🗺 Googleマップで開く</button>
+    <button class="btn btn-sub" style="flex:1" onclick="clearRouteSel()">選び直す</button>
+    <button class="btn btn-sub" style="flex:1" onclick="toggleRouteMode()">✕ 終了</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* ===== Firebase読み取り節約(通信の自動休止・再開) 2026-10 =====
+   ・画面が見えていない(別タブ・最小化・スマホのスリープ)状態が5分続いたら、リアルタイム監視を止めます
+     → 画面に戻ると自動で再開します
+   ・夜間(19時〜翌6時)は、30分さわらなければ休止します(モニター出しっぱなし対策)
+     → 画面をタップすると再開、朝6時には自動で再開します
+   ※このブロックは全アプリ共通です。時間を変えるときは下の数字だけ変えてください */
+(function(){
+  if(!window.firebase || !firebase.firestore) return;
+  var NIGHT_FROM = 19;              // 夜間休止の開始(時)
+  var NIGHT_TO   = 6;               // 夜間休止の終了(時)
+  var HIDDEN_WAIT = 5*60*1000;      // 見えなくなってから休止するまで(5分)
+  var NIGHT_IDLE  = 30*60*1000;     // 夜間、さわらずに休止するまで(30分)
+
+  var subs = [], paused = false, reason = '', hiddenTimer = null, lastInput = Date.now(), overlay = null;
+  function isNight(){ var h = new Date().getHours(); return h >= NIGHT_FROM || h < NIGHT_TO; }
+  function isVisible(){ return document.visibilityState !== 'hidden'; }
+
+  // onSnapshot(リアルタイム監視)を、止めたり再開したりできる形に包む
+  function wrap(proto){
+    if(!proto) return;
+    var orig = proto.onSnapshot;
+    if(!orig || orig.__fsSaver) return;
+    var w = function(){
+      var s = { ref:this, args:Array.prototype.slice.call(arguments), unsub:null, dead:false };
+      s.start = function(){ if(!s.dead && !s.unsub) s.unsub = orig.apply(s.ref, s.args); };
+      s.stop  = function(){ if(s.unsub){ try{ s.unsub(); }catch(e){} s.unsub = null; } };
+      subs.push(s);
+      if(!paused) s.start();
+      return function(){ s.dead = true; s.stop(); var i = subs.indexOf(s); if(i >= 0) subs.splice(i, 1); };
+    };
+    w.__fsSaver = true;
+    proto.onSnapshot = w;
+  }
+  wrap(firebase.firestore.Query && firebase.firestore.Query.prototype);
+  wrap(firebase.firestore.CollectionReference && firebase.firestore.CollectionReference.prototype);
+  wrap(firebase.firestore.DocumentReference && firebase.firestore.DocumentReference.prototype);
+
+  function showOverlay(){
+    if(!document.body) return;
+    if(!overlay){
+      overlay = document.createElement('div');
+      overlay.id = 'fsSaverOverlay';
+      overlay.setAttribute('style', 'position:fixed;inset:0;z-index:2147483000;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:16px;cursor:pointer;');
+      overlay.innerHTML = '<div style="background:#fff;color:#1f2937;border-radius:16px;padding:24px 22px;max-width:420px;width:100%;text-align:center;font-family:sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.3);">'
+        + '<div style="font-size:42px;line-height:1;">💤</div>'
+        + '<div style="font-size:20px;font-weight:bold;margin:10px 0 8px;">通信を休止しています</div>'
+        + '<div style="font-size:14px;line-height:1.7;color:#4b5563;">夜間(' + NIGHT_FROM + '時〜翌' + NIGHT_TO + '時)は、Firebaseの無料枠を節約するため自動で休止します。<br>朝' + NIGHT_TO + '時に自動で再開します。</div>'
+        + '<div style="margin-top:16px;background:#16a34a;color:#fff;border-radius:999px;padding:12px;font-size:16px;font-weight:bold;">👆 タップして再開</div>'
+        + '</div>';
+      document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+  }
+  function hideOverlay(){ if(overlay) overlay.style.display = 'none'; }
+
+  function pause(why){
+    if(paused) return;
+    paused = true; reason = why;
+    subs.forEach(function(s){ s.stop(); });
+    if(why === 'night') showOverlay();
+  }
+  function resume(byTap){
+    lastInput = Date.now();
+    if(!paused) return;
+    paused = false; reason = '';
+    // タップで再開したときは、そのタップが下のボタンに届かないよう少し待ってから幕を外す
+    if(byTap) setTimeout(hideOverlay, 500); else hideOverlay();
+    subs.forEach(function(s){ s.start(); });
+  }
+
+  // 画面の表示・非表示
+  document.addEventListener('visibilitychange', function(){
+    if(isVisible()){
+      if(hiddenTimer){ clearTimeout(hiddenTimer); hiddenTimer = null; }
+      resume(false);
+    }else if(!hiddenTimer){
+      hiddenTimer = setTimeout(function(){ hiddenTimer = null; if(!isVisible()) pause('hidden'); }, HIDDEN_WAIT);
+    }
+  });
+
+  // さわったら「使っている」とみなす(休止中なら再開)
+  ['pointerdown','touchstart','keydown','wheel'].forEach(function(ev){
+    window.addEventListener(ev, function(e){
+      if(paused && reason === 'night'){ resume(true); return; }
+      lastInput = Date.now();
+    }, { capture:true, passive:true });
+  });
+
+  // 1分ごとに夜間・朝の判定
+  setInterval(function(){
+    if(!isVisible()) return;
+    if(!paused && isNight() && Date.now() - lastInput > NIGHT_IDLE) pause('night');
+    else if(paused && reason === 'night' && !isNight()) resume(false);
+  }, 60*1000);
+
+  // 確認用(ブラウザのコンソールで fsSaver.status() と打つと状態が見られます)
+  window.fsSaver = {
+    status: function(){ return { paused:paused, reason:reason, listeners:subs.length }; },
+    pause: function(){ pause('night'); },
+    resume: function(){ resume(false); }
+  };
+})();
+</script>
+
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyD99Mx0MnGpLSQjV7830bS7-gdCBSM9DGY",
+  authDomain: "sekine-store.firebaseapp.com",
+  projectId: "sekine-store",
+  appId: "1:781856496751:web:e2e1e5de4cd803415a819a"
+});
+const db = firebase.firestore();
+const COL = "master_vehicles";
+let bodyShapeDocs = [], insurerDocs = [], makerDocs = [];
+function fillOptionSelects(){
+  const fill = (ids, docs) => ids.forEach(([id,ph])=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    const cur = el.value;
+    el.innerHTML = `<option value="">${ph}</option>` + docs.map(d=>`<option value="${esc(d.name)}">${esc(d.name)}</option>`).join("");
+    if(cur) el.value = cur;
+  });
+  fill([["addModel","車種(車体の形状から選択)"],["editModel","未選択"]], bodyShapeDocs);
+  fill([["addInsurer","保険会社"],["editInsurer","未選択"]], insurerDocs);
+  fill([["addMaker","メーカー"],["editMaker","未選択"]], makerDocs);
+  renderOptionMaster();
+}
+const OPT_DEFS = [
+  { col:"vehicleMakers", label:"🏭 メーカー", get:()=>makerDocs, fields:["name","phone","address"], ph:["メーカー名(例:いすゞ)","電話(任意)","住所(任意)"] },
+  { col:"bodyShapes", label:"🚛 車体の形状", get:()=>bodyShapeDocs, fields:["name"], ph:["形状名(例:ダンプ)"] },
+  { col:"insuranceCompanies", label:"🛡 保険会社", get:()=>insurerDocs, fields:["name","phone"], ph:["保険会社名","電話(任意)"] }
+];
+function renderOptionMaster(){
+  const box = document.getElementById("optionMaster");
+  if(!box) return;
+  box.innerHTML = OPT_DEFS.map((def,di)=>`
+    <div style="background:#f8fafc;border-radius:12px;padding:10px;margin-top:10px;">
+      <div style="font-weight:bold;font-size:14px;margin-bottom:6px;">${def.label}</div>
+      ${def.get().map(d=>`
+        <div style="display:flex;align-items:center;gap:6px;padding:7px 4px;border-bottom:1px solid #eef2f7;font-size:14px;">
+          <div style="flex:1;">${esc(d.name||"")}${d.phone?`<span style="font-size:12px;color:#64748b;">　📞${esc(d.phone)}</span>`:""}${d.address?`<div style="font-size:11px;color:#94a3b8;">📍${esc(d.address)}</div>`:""}</div>
+          <button onclick="editOption(${di},'${d.id}')" style="border:none;background:#e0f2fe;color:#0369a1;border-radius:8px;padding:7px 11px;">✏️</button>
+          <button onclick="deleteOption(${di},'${d.id}')" style="border:none;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:7px 11px;">🗑</button>
+        </div>`).join("") || '<div style="color:#94a3b8;font-size:13px;">まだ登録がありません</div>'}
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        ${def.fields.map((f,fi)=>`<input type="text" id="opt_${di}_${f}" placeholder="${def.ph[fi]}" style="flex:${f==="name"?2:1};min-width:0;">`).join("")}
+        <button onclick="addOption(${di})" style="border:none;background:#0d9488;color:#fff;border-radius:8px;padding:8px 14px;font-weight:bold;">追加</button>
+      </div>
+    </div>`).join("");
+}
+window.addOption = async function(di){
+  const def = OPT_DEFS[di];
+  const data = {};
+  def.fields.forEach(f=>{ data[f] = document.getElementById(`opt_${di}_${f}`).value.trim(); });
+  if(!data.name){ toast("名前を入力してください"); return; }
+  try{
+    await db.collection(def.col).add(data);
+    def.fields.forEach(f=>document.getElementById(`opt_${di}_${f}`).value="");
+    toast("✅ 追加しました");
+  }catch(e){ toast("⚠️ 追加に失敗しました"); }
+};
+window.editOption = async function(di, id){
+  const def = OPT_DEFS[di];
+  const d = def.get().find(x=>x.id===id);
+  if(!d) return;
+  const upd = {};
+  for(const f of def.fields){
+    const label = f==="name"?"名前":(f==="phone"?"電話番号":"住所");
+    const v = prompt(label, d[f]||"");
+    if(v===null) return;
+    upd[f] = v.trim();
+  }
+  if(!upd.name){ toast("名前は空にできません"); return; }
+  try{ await db.collection(def.col).doc(id).update(upd); toast("✅ 変更しました"); }
+  catch(e){ toast("⚠️ 変更に失敗しました"); }
+};
+window.deleteOption = async function(di, id){
+  const def = OPT_DEFS[di];
+  const d = def.get().find(x=>x.id===id);
+  if(!d) return;
+  if(!confirm(`「${d.name||""}」を削除しますか？\n(業務管理・マスタ管理の選択肢から消えます。すでに車両に設定済みの値は残ります)`)) return;
+  try{ await db.collection(def.col).doc(id).delete(); toast("🗑 削除しました"); }
+  catch(e){ toast("⚠️ 削除に失敗しました"); }
+};
+db.collection("bodyShapes").orderBy("name").onSnapshot(snap=>{
+  bodyShapeDocs = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(d=>d.name);
+  fillOptionSelects();
+}, err=>console.error(err));
+db.collection("insuranceCompanies").orderBy("name").onSnapshot(snap=>{
+  insurerDocs = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(d=>d.name);
+  fillOptionSelects();
+}, err=>console.error(err));
+db.collection("vehicleMakers").orderBy("name").onSnapshot(snap=>{
+  makerDocs = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(d=>d.name);
+  fillOptionSelects();
+}, err=>console.error(err));
+
+let vehicles = [];
+let sortMode = "shaken";
+let editingId = null;
+
+/* ---------- データ購読 ---------- */
+db.collection(COL).onSnapshot(
+  snap => {
+    vehicles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    render();
+    // ISO管理「車両の愛称一覧」の「✏️ 直す」から来たとき(#veh=車両のid)：その車の編集画面を開く(2026/11/5)
+    const hv = (location.hash.match(/^#veh=(.+)$/) || [])[1];
+    if (hv) { try { history.replaceState(null, "", location.pathname + location.search); } catch(e) {}
+      try { switchTab("vehicles"); } catch(e) {} if (vehicles.some(x => x.id === decodeURIComponent(hv))) openEdit(decodeURIComponent(hv)); }
+  },
+  err => {
+    console.error(err);
+    toast("⚠️ データ読み込みエラー(通信・ルールを確認)");
+  }
+);
+
+/* ---------- 表示 ---------- */
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d = new Date(dateStr + "T00:00:00");
+  return Math.round((d - today) / 86400000);
+}
+function shakenBadge(dateStr) {
+  const days = daysUntil(dateStr);
+  if (days === null) return `<span class="badge ok">未登録</span>`;
+  const label = dateStr.replace(/-/g, "/");
+  if (days < 0)   return `<span class="badge expired">期限切れ ${label}</span>`;
+  if (days <= 30) return `<span class="badge urgent">${label}</span>`;
+  if (days <= 60) return `<span class="badge soon">${label}</span>`;
+  return `<span class="badge ok">${label}</span>`;
+}
+// 愛称がメイン。車番は愛称と違うときだけ下に表示
+function vMainName(v){ return (v.nickname || "").trim() || (v.number || "").trim() || "名称未設定"; }
+function vPlateOnly(v){
+  const n = (v.number || "").trim();
+  return (n && vkey(n) !== vkey(vMainName(v))) ? n : "";
+}
+function vkey(s){ return (s||"").toString().normalize("NFKC").replace(/[\s\u3000]/g,"").toLowerCase(); }
+function render() {
+  const q = (document.getElementById("searchBox").value || "").trim();
+  let list = vehicles.slice();
+  if (q) list = list.filter(v => (v.number||"").includes(q) || (v.model||"").includes(q) || (v.nickname||"").includes(q));
+
+  if (sortMode === "shaken") {
+    list.sort((a,b) => (a.shakenDate || "9999-99-99").localeCompare(b.shakenDate || "9999-99-99"));
+  } else {
+    list.sort((a,b) => vMainName(a).localeCompare(vMainName(b), "ja"));
+  }
+
+  const wrap = document.getElementById("vehicleList");
+  if (!list.length) {
+    wrap.innerHTML = `<div class="empty">車両がまだ登録されていません。<br>上のフォームか一括登録で追加してください。</div>`;
+  } else {
+    wrap.innerHTML = list.map(v => {
+      const days = daysUntil(v.shakenDate);
+      const daysText = days === null ? "" :
+        days < 0 ? `${-days}日超過` : `あと${days}日`;
+      return `
+      <div class="v-card">
+        <div class="v-info">
+          <div class="v-number">${esc(vMainName(v))}</div>
+          <div class="v-model" style="font-weight:600;color:#334155;">🚘 ${vPlateOnly(v) ? esc(vPlateOnly(v)) : '<span style="color:#cbd5e1;font-weight:400;">車番未登録</span>'}</div>
+          <div class="v-model">${v.maker?`${esc(v.maker)}　`:""}${esc(v.model || "")}${v.katashiki?`　型式 ${esc(v.katashiki)}`:""}</div>
+          ${(v.firstReg||v.haikiryo||v.maxLoad||v.totalWeight)?`<div class="v-model" style="font-size:12px;color:#94a3b8;">${v.firstReg?`初年度 ${esc(v.firstReg)}　`:""}${v.haikiryo?`排気量 ${esc(v.haikiryo)}　`:""}${v.maxLoad?`積載 ${esc(v.maxLoad)}kg　`:""}${v.weight?`重量 ${esc(v.weight)}kg　`:""}${v.totalWeight?`総重量 ${esc(v.totalWeight)}kg`:""}</div>`:""}
+          ${(v.lengthCm||v.widthCm)?`<div class="v-model" style="font-size:12px;color:#94a3b8;">📏 長さ ${esc(v.lengthCm||"-")}cm　幅 ${esc(v.widthCm||"-")}cm${v.heightCm?`　高さ ${esc(v.heightCm)}cm`:""}</div>`:`<div class="v-model" style="font-size:12px;color:#cbd5e1;">📏 サイズ未入力</div>`}
+          ${(v.insurer||v.insurerMemo)?`<div class="v-model" style="font-size:12px;color:#0d9488;">🛡 ${esc(v.insurer||"")}${v.insurerMemo?`　${esc(v.insurerMemo)}`:""}</div>`:""}
+        </div>
+        <div class="v-shaken">
+          ${shakenBadge(v.shakenDate)}
+          <div class="v-days">${daysText}</div>
+        </div>
+        <button class="v-edit" onclick="openEdit('${v.id}')">✏️</button>
+      </div>`;
+    }).join("");
+  }
+
+  document.getElementById("sumTotal").textContent = vehicles.length;
+  document.getElementById("sumUrgent").textContent =
+    vehicles.filter(v => { const d = daysUntil(v.shakenDate); return d !== null && d <= 30; }).length;
+  document.getElementById("sumSoon").textContent =
+    vehicles.filter(v => { const d = daysUntil(v.shakenDate); return d !== null && d > 30 && d <= 60; }).length;
+}
+function esc(s){ return (s||"").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+/* ---------- 重複チェック(愛称・車番) ---------- */
+function vehicleDupMessage(nickname, number, selfId){
+  const others = vehicles.filter(v => v.id !== selfId);
+  if (number && others.some(v => vkey(v.number) === vkey(number))) return "⚠️ 同じ車番がすでに登録されています";
+  if (nickname && others.some(v => vkey(v.nickname) === vkey(nickname) || (!v.nickname && vkey(v.number) === vkey(nickname)))) return "⚠️ 同じ愛称がすでに登録されています";
+  return "";
+}
+
+/* ---------- 長さ・幅・高さ(cm) ---------- */
+// 全角数字やcm・カンマが入っても半角の数字だけにする。m単位(例:8.49)で入れた場合はcmに直す
+function cmVal(id){
+  let t = (document.getElementById(id).value || "").trim()
+    .replace(/[０-９．]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[,，\s]|cm|ｃｍ/gi, "");
+  if (!t) return "";
+  const n = parseFloat(t);
+  if (isNaN(n) || n <= 0) return "";
+  return String(Math.round(n < 30 ? n * 100 : n));
+}
+
+/* ---------- 登録 ---------- */
+async function addVehicle() {
+  const number = document.getElementById("addNumber").value.trim();
+  const model  = document.getElementById("addModel").value.trim();
+  const nickname = document.getElementById("addNickname").value.trim();
+  const extra = {
+    maker: document.getElementById("addMaker").value,
+    firstReg: document.getElementById("addFirstReg").value,
+    katashiki: document.getElementById("addKatashiki").value.trim(),
+    haikiryo: document.getElementById("addHaikiryo").value.trim(),
+    maxLoad: document.getElementById("addMaxLoad").value.trim(),
+    weight: document.getElementById("addWeight").value.trim(),
+    totalWeight: document.getElementById("addTotalWeight").value.trim(),
+    lengthCm: cmVal("addLength"),
+    widthCm: cmVal("addWidth"),
+    heightCm: cmVal("addHeight"),
+    insurer: document.getElementById("addInsurer").value,
+    insurerMemo: document.getElementById("addInsurerMemo").value.trim()
+  };
+  const shaken = document.getElementById("addShaken").value;
+  if (extra.lengthCm && extra.widthCm && Number(extra.widthCm) > Number(extra.lengthCm)) { toast("⚠️ 長さと幅が逆かもしれません(長さの方が大きくなります)"); return; }
+  if (!number && !nickname) { toast("愛称か車番を入力してください"); return; }
+  { const dm = vehicleDupMessage(nickname, number, null); if (dm) { toast(dm); return; } }
+  try {
+    await db.collection(COL).add({
+      number, model, nickname, ...extra, shakenDate: shaken || "",
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById("addNumber").value = "";
+    document.getElementById("addNickname").value = "";
+    ["addFirstReg","addKatashiki","addHaikiryo","addMaxLoad","addWeight","addTotalWeight","addLength","addWidth","addHeight","addInsurerMemo"].forEach(id=>document.getElementById(id).value="");
+    document.getElementById("addMaker").value = "";
+    document.getElementById("addInsurer").value = "";
+    document.getElementById("addModel").value = "";
+    document.getElementById("addShaken").value = "";
+    toast("✅ 登録しました");
+  } catch(e) { console.error(e); toast("⚠️ 保存に失敗しました"); }
+}
+
+/* ---------- 一括登録 ---------- */
+function toggleBulk() {
+  document.getElementById("bulkHead").classList.toggle("open");
+  document.getElementById("bulkBody").classList.toggle("show");
+}
+function normDate(s) {
+  if (!s) return "";
+  const m = s.trim().replace(/／/g,"/").match(/^(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})日?$/);
+  if (!m) return "";
+  return `${m[1]}-${String(m[2]).padStart(2,"0")}-${String(m[3]).padStart(2,"0")}`;
+}
+async function bulkAdd() {
+  const lines = document.getElementById("bulkText").value.split("\n").map(l => l.trim()).filter(Boolean);
+  if (!lines.length) { toast("入力がありません"); return; }
+  let ok = 0, skip = 0;
+  const batch = db.batch();
+  const existing = new Set(vehicles.map(v => v.number));
+  for (const line of lines) {
+    const parts = line.split(/[,、，]/).map(p => p.trim());
+    const number = parts[0];
+    if (!number || existing.has(number)) { skip++; continue; }
+    existing.add(number);
+    const ref = db.collection(COL).doc();
+    batch.set(ref, {
+      number,
+      model: parts[1] || "",
+      shakenDate: normDate(parts[2] || ""),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    ok++;
+  }
+  if (!ok) { toast("登録できる行がありません(重複?)"); return; }
+  try {
+    await batch.commit();
+    document.getElementById("bulkText").value = "";
+    toast(`✅ ${ok}台を登録しました${skip ? `(${skip}行スキップ)` : ""}`);
+  } catch(e) { console.error(e); toast("⚠️ 一括登録に失敗しました"); }
+}
+
+/* ---------- 編集・削除 ---------- */
+function openEdit(id) {
+  const v = vehicles.find(x => x.id === id);
+  if (!v) return;
+  editingId = id;
+  document.getElementById("editNumber").value = v.number || "";
+  document.getElementById("editModel").value = v.model || "";
+  document.getElementById("editNickname").value = v.nickname || "";
+  document.getElementById("editMaker").value = v.maker || "";
+  document.getElementById("editFirstReg").value = v.firstReg || "";
+  document.getElementById("editKatashiki").value = v.katashiki || "";
+  document.getElementById("editHaikiryo").value = v.haikiryo || "";
+  document.getElementById("editMaxLoad").value = v.maxLoad || "";
+  document.getElementById("editWeight").value = v.weight || "";
+  document.getElementById("editTotalWeight").value = v.totalWeight || "";
+  document.getElementById("editLength").value = v.lengthCm || "";
+  document.getElementById("editWidth").value = v.widthCm || "";
+  document.getElementById("editHeight").value = v.heightCm || "";
+  document.getElementById("editInsurer").value = v.insurer || "";
+  document.getElementById("editInsurerMemo").value = v.insurerMemo || "";
+  document.getElementById("editShaken").value = v.shakenDate || "";
+  document.getElementById("editModalBg").classList.add("show");
+}
+function closeEdit() {
+  editingId = null;
+  document.getElementById("editModalBg").classList.remove("show");
+}
+async function saveEdit() {
+  if (!editingId) return;
+  const number = document.getElementById("editNumber").value.trim();
+  const nickForCheck = document.getElementById("editNickname").value.trim();
+  if (!number && !nickForCheck) { toast("愛称か車番を入力してください"); return; }
+  { const dm = vehicleDupMessage(nickForCheck, number, editingId); if (dm) { toast(dm); return; } }
+  try {
+    await db.collection(COL).doc(editingId).update({
+      number,
+      model: document.getElementById("editModel").value.trim(),
+      nickname: document.getElementById("editNickname").value.trim(),
+      maker: document.getElementById("editMaker").value,
+      firstReg: document.getElementById("editFirstReg").value,
+      katashiki: document.getElementById("editKatashiki").value.trim(),
+      haikiryo: document.getElementById("editHaikiryo").value.trim(),
+      maxLoad: document.getElementById("editMaxLoad").value.trim(),
+      weight: document.getElementById("editWeight").value.trim(),
+      totalWeight: document.getElementById("editTotalWeight").value.trim(),
+      lengthCm: cmVal("editLength"),
+      widthCm: cmVal("editWidth"),
+      heightCm: cmVal("editHeight"),
+      insurer: document.getElementById("editInsurer").value,
+      insurerMemo: document.getElementById("editInsurerMemo").value.trim(),
+      shakenDate: document.getElementById("editShaken").value || "",
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    closeEdit();
+    toast("✅ 保存しました");
+  } catch(e) { console.error(e); toast("⚠️ 保存に失敗しました"); }
+}
+async function deleteVehicle() {
+  if (!editingId) return;
+  const v = vehicles.find(x => x.id === editingId);
+  if (!confirm(`「${v ? vMainName(v) : ""}」を削除しますか?\nこの操作は元に戻せません。`)) return;
+  try {
+    await db.collection(COL).doc(editingId).delete();
+    closeEdit();
+    toast("🗑 削除しました");
+  } catch(e) { console.error(e); toast("⚠️ 削除に失敗しました"); }
+}
+
+/* ---------- タブ切り替え ---------- */
+function switchTab(tab) {
+  document.getElementById("tabVehicles").style.display = (tab === "vehicles") ? "block" : "none";
+  document.getElementById("tabClients").style.display = (tab === "clients") ? "block" : "none";
+  document.getElementById("tabContracts").style.display = (tab === "contracts") ? "block" : "none";
+  document.getElementById("tabStaff").style.display = (tab === "staff") ? "block" : "none";
+  document.getElementById("tabWorkcal").style.display = (tab === "workcal") ? "block" : "none";
+  document.getElementById("tabBtnVehicles").classList.toggle("active", tab === "vehicles");
+  document.getElementById("tabBtnClients").classList.toggle("active", tab === "clients");
+  document.getElementById("tabBtnContracts").classList.toggle("active", tab === "contracts");
+  document.getElementById("tabBtnStaff").classList.toggle("active", tab === "staff");
+  document.getElementById("tabBtnWorkcal").classList.toggle("active", tab === "workcal");
+  if (tab === "staff") loadStaffTab();
+  if (tab === "workcal") renderWorkcal();
+  if (tab === "contracts") { mDispFilter = ""; mSheetFilter = ""; mKanaFilter = ""; loadContracts(); }
+  if (tab !== "clients" && routeMode) toggleRouteMode();
+}
+
+/* ---------- 従業員マスタ(業務管理のemployeesを共用) ---------- */
+const STAFF_COL = "employees";
+let staffMembers = [];
+let staffLoaded = false;
+function loadStaffTab() {
+  if (staffLoaded) return;
+  staffLoaded = true;
+  db.collection(STAFF_COL).onSnapshot(snap => {
+    staffMembers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const eo = (e) => (e.order !== undefined && e.order !== null) ? e.order : 9999;
+    staffMembers.sort((a,b) => eo(a) - eo(b));
+    renderStaffTab();
+  }, err => { console.error(err); toast("⚠️ 従業員の読み込みエラー"); });
+  db.collection("master_meta").doc("teamCopy").get().then(d => {
+    document.getElementById("teamCopyBox").style.display = d.exists ? "none" : "block";
+  }).catch(e => console.error(e));
+}
+function renderStaffTab() {
+  const wrap = document.getElementById("staffListWrap");
+  if (!staffMembers.length) { wrap.innerHTML = '<div class="empty">従業員がまだ登録されていません</div>'; return; }
+  wrap.innerHTML = staffMembers.map((e, i) => `
+    <div class="v-card">
+      <div class="v-info">
+        <div class="v-number">${i + 1}. ${esc(e.name || "")}</div>
+        <div style="display:flex;gap:6px;margin-top:6px;">${["A","B","free"].map(t => `<button onclick="setStaffTeam('${e.id}','${t}')" style="border:1.5px solid ${TEAM_COLOR[t]};background:${e.team === t ? TEAM_COLOR[t] : "#fff"};color:${e.team === t ? "#fff" : TEAM_COLOR[t]};border-radius:999px;padding:4px 12px;font-size:13px;font-weight:700;">${TEAM_LABEL[t]}</button>`).join("")}${e.team ? "" : '<span style="font-size:12px;color:#94a3b8;align-self:center;">班未設定</span>'}</div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button onclick="moveStaffMember('${e.id}',-1)" style="border:none;background:#f1f5f9;color:#334155;border-radius:8px;padding:8px 12px;">▲</button>
+        <button onclick="moveStaffMember('${e.id}',1)" style="border:none;background:#f1f5f9;color:#334155;border-radius:8px;padding:8px 12px;">▼</button>
+        <button onclick="renameStaffMember('${e.id}')" style="border:none;background:#e0f2fe;color:#0369a1;border-radius:8px;padding:8px 12px;">✏️</button>
+        <button onclick="deleteStaffMember('${e.id}')" style="border:none;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:8px 12px;">🗑</button>
+      </div>
+    </div>`).join("");
+}
+async function addStaffMember() {
+  const name = document.getElementById("addStaffName").value.trim();
+  if (!name) { toast("従業員名を入力してください"); return; }
+  if (staffMembers.some(e => e.name === name)) { toast("⚠️ 同じ名前がすでに登録されています"); return; }
+  const maxOrder = staffMembers.reduce((m, e) => Math.max(m, (e.order ?? 0)), 0);
+  try {
+    await db.collection(STAFF_COL).add({ name, qualifications: [], order: maxOrder + 1 });
+    document.getElementById("addStaffName").value = "";
+    toast("✅ 追加しました");
+  } catch(e) { toast("⚠️ 追加に失敗しました"); }
+}
+/* 班(A班/B班/フリー)。配車ボード・関根カレンダーはここの employees.team を読むだけ */
+const TEAM_LABEL = { A:"A班", B:"B班", free:"フリー" };
+const TEAM_COLOR = { A:"#1976d2", B:"#2e7d32", free:"#e91e63" };
+window.setStaffTeam = async function(id, team) {
+  const e = staffMembers.find(x => x.id === id);
+  if (!e) return;
+  const next = e.team === team ? null : team;
+  try {
+    await db.collection(STAFF_COL).doc(id).update({ team: next });
+    toast(next ? "✅ " + e.name + " → " + TEAM_LABEL[next] : "✅ " + e.name + " の班を外しました");
+  } catch(err) { console.error(err); toast("⚠️ 保存に失敗しました"); }
+};
+/* 配車ボード(pickupSettings/workerBentoProfiles の profiles[名前].team)の班を、1回だけ employees.team へ写す */
+window.copyTeamsFromBoard = async function() {
+  const btn = document.getElementById("teamCopyBtn");
+  btn.disabled = true;
+  try {
+    const d = await db.collection("pickupSettings").doc("workerBentoProfiles").get();
+    const profiles = (d.exists && d.data().profiles) || {};
+    const hits = staffMembers.filter(e => profiles[e.name] && TEAM_LABEL[profiles[e.name].team]);
+    const misses = staffMembers.filter(e => !hits.includes(e)).map(e => e.name);
+    if (!confirm(hits.length + "人の班を写します。\n\n" + hits.map(e => "・" + e.name + " → " + TEAM_LABEL[profiles[e.name].team]).join("\n") +
+      (misses.length ? "\n\n配車ボードで班が決まっていない人(あとでここで設定):\n" + misses.join("、") : ""))) return;
+    const batch = db.batch();
+    hits.forEach(e => batch.update(db.collection(STAFF_COL).doc(e.id), { team: profiles[e.name].team }));
+    batch.set(db.collection("master_meta").doc("teamCopy"), { doneAt: firebase.firestore.FieldValue.serverTimestamp(), count: hits.length });
+    await batch.commit();
+    document.getElementById("teamCopyBox").style.display = "none";
+    toast("✅ " + hits.length + "人の班を写しました");
+  } catch(err) { console.error(err); toast("⚠️ 写せませんでした"); }
+  finally { btn.disabled = false; }
+};
+window.moveStaffMember = async function(id, dir) {
+  const idx = staffMembers.findIndex(e => e.id === id);
+  const j = idx + dir;
+  if (idx < 0 || j < 0 || j >= staffMembers.length) return;
+  const arr = staffMembers.slice();
+  const t = arr[idx]; arr[idx] = arr[j]; arr[j] = t;
+  try {
+    const batch = db.batch();
+    arr.forEach((e, i2) => batch.update(db.collection(STAFF_COL).doc(e.id), { order: i2 + 1 }));
+    await batch.commit();
+  } catch(e) { toast("⚠️ 並べ替えに失敗しました"); }
+};
+window.renameStaffMember = async function(id) {
+  const e = staffMembers.find(x => x.id === id);
+  if (!e) return;
+  const n = prompt("新しい名前", e.name || "");
+  if (!n || !n.trim() || n.trim() === e.name) return;
+  try {
+    await db.collection(STAFF_COL).doc(id).update({ name: n.trim() });
+    toast("✅ 変更しました");
+  } catch(err) { toast("⚠️ 変更に失敗しました"); }
+};
+window.deleteStaffMember = async function(id) {
+  const e = staffMembers.find(x => x.id === id);
+  if (!e) return;
+  if (!confirm("「" + (e.name||"") + "」を削除しますか？\n\n⚠️ 業務管理に登録された資格情報も一緒に消えます。退職などで本当に不要な場合だけ削除してください。")) return;
+  try {
+    await db.collection(STAFF_COL).doc(id).delete();
+    toast("🗑 削除しました");
+  } catch(err) { toast("⚠️ 削除に失敗しました"); }
+};
+
+/* ---------- 取引先マスタ ---------- */
+const CLIENT_COL = "master_clients";
+let clients = [];
+let editingClientId = null;
+
+db.collection(CLIENT_COL).onSnapshot(
+  snap => {
+    clients = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderClients();
+  },
+  err => { console.error(err); }
+);
+
+let kanaFilter = "";
+const KANA_ROWS = [
+  ["あ","あいうえお"],["か","かきくけこがぎぐげご"],["さ","さしすせそざじずぜぞ"],
+  ["た","たちつてとだぢづでど"],["な","なにぬねの"],["は","はひふへほばびぶべぼぱぴぷぺぽ"],
+  ["ま","まみむめも"],["や","やゆよ"],["ら","らりるれろ"],["わ","わをん"]
+];
+function kanaRowOf(s) {
+  const ch = (s || "").charAt(0);
+  const k = ch.normalize("NFKC");
+  // カタカナ→ひらがな・長音対応
+  const hira = k.replace(/[\u30a1-\u30f6]/g, m => String.fromCharCode(m.charCodeAt(0) - 0x60));
+  for (const [label, chars] of KANA_ROWS) {
+    if (chars.includes(hira)) return label;
+  }
+  return "他";
+}
+function setKanaFilter(label) {
+  kanaFilter = (kanaFilter === label) ? "" : label;
+  renderClients();
+}
+function renderKanaIndex() {
+  const box = document.getElementById("kanaIndex");
+  if (!box) return;
+  const labels = KANA_ROWS.map(r => r[0]).concat(["他"]);
+  box.innerHTML = labels.map(l =>
+    `<button onclick="setKanaFilter('${l}')" style="flex:1;min-width:34px;padding:8px 0;border:none;border-radius:8px;font-size:14px;font-weight:700;background:${kanaFilter===l?'#0d9488':'#fff'};color:${kanaFilter===l?'#fff':'#475569'};box-shadow:0 1px 3px rgba(0,0,0,.08);">${l}</button>`
+  ).join("");
+}
+function renderClients() {
+  renderKanaIndex();
+  document.getElementById("sumClients").textContent = clients.length;
+  const q = (document.getElementById("clientSearchBox").value || "").trim();
+  let list = clients.slice();
+  if (q) list = list.filter(c => [c.name, c.yomi, c.address, c.tel, c.note].some(v => (v||"").includes(q)));
+  const sortKey = c => (c.yomi || c.name || "");
+  if (kanaFilter) list = list.filter(c => kanaRowOf(sortKey(c)) === kanaFilter);
+  list.sort((a,b) => sortKey(a).localeCompare(sortKey(b), "ja"));
+  const wrap = document.getElementById("clientList");
+  if (!list.length) {
+    wrap.innerHTML = `<div class="empty">取引先がまだ登録されていません。<br>上のフォームか一括登録で追加してください。</div>`;
+    return;
+  }
+  wrap.innerHTML = list.map(c => {
+    if (routeMode) {
+      const order = routeSel.indexOf(c.id);
+      const sel = order >= 0;
+      return `
+    <div class="v-card ${sel ? "route-sel" : ""}" onclick="toggleRouteSel('${c.id}')">
+      <div class="v-info">
+        <div class="v-number">${esc(c.name)}</div>
+        <div class="v-model">${esc([c.address, c.tel].filter(Boolean).join(" ・ ")) || "⚠ 住所未登録(会社名で検索されます)"}</div>
+      </div>
+      <div class="route-badge ${sel ? "num" : ""}">${sel ? order + 1 : ""}</div>
+    </div>`;
+    }
+    return `
+    <div class="v-card">
+      <div class="v-info">
+        <div class="v-number">${esc(c.name)}</div>
+        <div class="v-model">${esc([c.address, c.tel, c.note].filter(Boolean).join(" ・ "))}</div>
+      </div>
+      <button class="v-edit" onclick="openClientEdit('${c.id}')">✏️</button>
+    </div>`;
+  }).join("");
+}
+
+/* ---------- 運搬ルート作成 ---------- */
+const ROUTE_ORIGIN_KEY = "sekine_route_origin";
+const ROUTE_HOME_ADDRESS = "長野県上田市住吉316-2";
+const ROUTE_MAX = 9; // Googleマップの経由地上限
+let routeMode = false;
+let routeSel = [];
+
+function toggleRouteMode() {
+  routeMode = !routeMode;
+  if (!routeMode) routeSel = [];
+  document.getElementById("routeModeBtn").classList.toggle("on", routeMode);
+  document.getElementById("routeModeBtn").textContent =
+    routeMode ? "🗺 ルート作成中(もう一度押すと終了)" : "🗺 運搬ルート作成(回る順に取引先を選ぶ)";
+  document.getElementById("routeBar").classList.toggle("show", routeMode);
+  document.body.classList.toggle("route-open", routeMode);
+  if (routeMode) {
+    document.getElementById("rbOrigin").value =
+      localStorage.getItem(ROUTE_ORIGIN_KEY) || ROUTE_HOME_ADDRESS;
+  }
+  updateRouteCount();
+  renderClients();
+}
+function saveRouteOrigin() {
+  localStorage.setItem(ROUTE_ORIGIN_KEY, document.getElementById("rbOrigin").value.trim());
+}
+function resetRouteOrigin() {
+  document.getElementById("rbOrigin").value = ROUTE_HOME_ADDRESS;
+  saveRouteOrigin();
+  toast("🏠 出発地を会社に戻しました");
+}
+function updateRouteCount() {
+  document.getElementById("rbCount").textContent = `${routeSel.length}件選択`;
+}
+function toggleRouteSel(id) {
+  const i = routeSel.indexOf(id);
+  if (i >= 0) {
+    routeSel.splice(i, 1);
+  } else {
+    if (routeSel.length >= ROUTE_MAX) { toast(`⚠️ 一度に選べるのは${ROUTE_MAX}件までです`); return; }
+    const c = clients.find(x => x.id === id);
+    if (c && !c.address) toast("⚠ 住所未登録のため会社名で検索されます");
+    routeSel.push(id);
+  }
+  updateRouteCount();
+  renderClients();
+}
+function clearRouteSel() {
+  routeSel = [];
+  updateRouteCount();
+  renderClients();
+}
+function routeQueryOf(c) {
+  return c.address ? c.address : `${c.name} 長野県`;
+}
+function openRouteMap() {
+  if (!routeSel.length) { toast("回る順に取引先をタップしてください"); return; }
+  const origin = document.getElementById("rbOrigin").value.trim();
+  if (!origin) { toast("出発地を入力してください"); return; }
+  saveRouteOrigin();
+  const stops = routeSel.map(id => clients.find(x => x.id === id)).filter(Boolean).map(routeQueryOf);
+  const round = document.getElementById("rbRound").checked;
+  let destination, waypoints;
+  if (round) {
+    destination = origin;
+    waypoints = stops;
+  } else {
+    destination = stops[stops.length - 1];
+    waypoints = stops.slice(0, -1);
+  }
+  let url = "https://www.google.com/maps/dir/?api=1"
+    + "&origin=" + encodeURIComponent(origin)
+    + "&destination=" + encodeURIComponent(destination)
+    + "&travelmode=driving";
+  if (waypoints.length) url += "&waypoints=" + waypoints.map(encodeURIComponent).join("%7C");
+  window.open(url, "_blank");
+}
+
+async function addClient() {
+  const name = document.getElementById("addClientName").value.trim();
+  const yomi = document.getElementById("addClientYomi").value.trim();
+  const address = document.getElementById("addClientAddress").value.trim();
+  const tel = document.getElementById("addClientTel").value.trim();
+  const note = document.getElementById("addClientNote").value.trim();
+  if (!name) { toast("会社名を入力してください"); return; }
+  if (clients.some(c => c.name === name)) { toast("⚠️ 同じ会社名がすでに登録されています"); return; }
+  try {
+    await db.collection(CLIENT_COL).add({
+      name, yomi, address, tel, note,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById("addClientName").value = "";
+    document.getElementById("addClientYomi").value = "";
+    document.getElementById("addClientAddress").value = "";
+    document.getElementById("addClientTel").value = "";
+    document.getElementById("addClientNote").value = "";
+    toast("✅ 登録しました");
+  } catch(e) { console.error(e); toast("⚠️ 保存に失敗しました"); }
+}
+
+function toggleClientBulk() {
+  document.getElementById("clientBulkHead").classList.toggle("open");
+  document.getElementById("clientBulkBody").classList.toggle("show");
+}
+
+async function clientBulkAdd() {
+  const lines = document.getElementById("clientBulkText").value.split("\n").map(l => l.trim()).filter(Boolean);
+  if (!lines.length) { toast("入力がありません"); return; }
+  let ok = 0, updated = 0, skip = 0;
+  const batch = db.batch();
+  const byName = {};
+  clients.forEach(c => { byName[c.name] = c; });
+  const added = new Set();
+  for (const line of lines) {
+    const parts = line.split(/[,，]/).map(p => p.trim());
+    const name = parts[0];
+    const yomi = parts[1] || "";
+    const address = parts[2] || "";
+    const tel = parts[3] || "";
+    const note = parts[4] || "";
+    if (!name) { skip++; continue; }
+    const ex = byName[name];
+    if (ex) {
+      const upd = {};
+      if (yomi && yomi !== (ex.yomi || "")) upd.yomi = yomi;
+      if (address && address !== (ex.address || "")) upd.address = address;
+      if (tel && tel !== (ex.tel || "")) upd.tel = tel;
+      if (note && note !== (ex.note || "")) upd.note = note;
+      if (Object.keys(upd).length) {
+        upd.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+        batch.update(db.collection(CLIENT_COL).doc(ex.id), upd);
+        updated++;
+      } else { skip++; }
+      continue;
+    }
+    if (added.has(name)) { skip++; continue; }
+    added.add(name);
+    const ref = db.collection(CLIENT_COL).doc();
+    batch.set(ref, {
+      name, yomi, address, tel, note,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    ok++;
+  }
+  if (!ok && !updated) { toast("登録・更新できる行がありません"); return; }
+  try {
+    await batch.commit();
+    document.getElementById("clientBulkText").value = "";
+    toast(`✅ 新規${ok}社・更新${updated}社${skip ? `(${skip}行スキップ)` : ""}`);
+  } catch(e) { console.error(e); toast("⚠️ 一括登録に失敗しました"); }
+}
+
+function openClientEdit(id) {
+  const c = clients.find(x => x.id === id);
+  if (!c) return;
+  editingClientId = id;
+  document.getElementById("editClientName").value = c.name || "";
+  document.getElementById("editClientYomi").value = c.yomi || "";
+  document.getElementById("editClientAddress").value = c.address || "";
+  document.getElementById("editClientTel").value = c.tel || "";
+  document.getElementById("editClientNote").value = c.note || "";
+  document.getElementById("clientModalBg").classList.add("show");
+}
+function closeClientEdit() {
+  editingClientId = null;
+  document.getElementById("clientModalBg").classList.remove("show");
+}
+async function saveClientEdit() {
+  if (!editingClientId) return;
+  const name = document.getElementById("editClientName").value.trim();
+  if (!name) { toast("会社名を入力してください"); return; }
+  if (clients.some(c => c.name === name && c.id !== editingClientId)) { toast("⚠️ 同じ会社名が他にあります"); return; }
+  try {
+    await db.collection(CLIENT_COL).doc(editingClientId).update({
+      name,
+      yomi: document.getElementById("editClientYomi").value.trim(),
+      address: document.getElementById("editClientAddress").value.trim(),
+      tel: document.getElementById("editClientTel").value.trim(),
+      note: document.getElementById("editClientNote").value.trim(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    closeClientEdit();
+    toast("✅ 保存しました");
+  } catch(e) { console.error(e); toast("⚠️ 保存に失敗しました"); }
+}
+async function deleteClient() {
+  if (!editingClientId) return;
+  const c = clients.find(x => x.id === editingClientId);
+  if (!confirm(`「${c ? c.name : ""}」を削除しますか?\nこの操作は元に戻せません。`)) return;
+  try {
+    await db.collection(CLIENT_COL).doc(editingClientId).delete();
+    closeClientEdit();
+    toast("🗑 削除しました");
+  } catch(e) { console.error(e); toast("⚠️ 削除に失敗しました"); }
+}
+
+/* ---------- 取引先の統合(表記ゆれでダブったものを1つにまとめる) 2026-10 ----------
+   残す取引先を選ぶと、
+   ・関根カレンダーの予定(calendarEvents)の会社名と紐づけを残すほうに付け替え
+   ・電話依頼(phoneRequests)の会社名も残すほうに直す
+   ・消すほうにだけ入っていた よみがな・住所・電話番号 は残すほうへ引き継ぎ
+   ・消すほうの取引先を削除
+   ※配車ボードは、カレンダーの予定が直ると自動で反映されます */
+const MERGE_IGNORE_KEY = "sekine_merge_ignore";
+function simKey(s) {
+  return (s || "").normalize("NFKC")
+    .replace(/株式会社|有限会社|合同会社|合資会社|\(株\)|\(有\)|（株）|（有）/g, "")
+    .replace(/[\s・.,，、。\-－―‐ー~〜]/g, "")
+    .replace(/[ァ-ヶ]/g, m => String.fromCharCode(m.charCodeAt(0) - 0x60))
+    .toLowerCase();
+}
+function editDist(a, b) {
+  if (Math.abs(a.length - b.length) > 3) return 99;
+  const dp = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    dp[i][j] = Math.min(dp[i-1][j] + 1, dp[i][j-1] + 1, dp[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+  return dp[a.length][b.length];
+}
+// 2つの会社名が「たぶん同じ会社」か
+function isSimilarName(n1, n2) {
+  const a = simKey(n1), b = simKey(n2);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const s = a.length <= b.length ? a : b, l = a.length <= b.length ? b : a;
+  if (s.length >= 4 && l.includes(s) && l.length - s.length <= 3) return true;
+  const d = editDist(a, b);
+  return (s.length >= 4 && d <= 1) || (s.length >= 8 && d <= 2);
+}
+function isSimilarClient(x, y) {
+  if (isSimilarName(x.name, y.name)) return true;
+  const ya = simKey(x.yomi), yb = simKey(y.yomi);
+  return ya.length >= 3 && ya === yb;
+}
+function mergeIgnored() { try { return JSON.parse(localStorage.getItem(MERGE_IGNORE_KEY) || "[]"); } catch(e) { return []; } }
+function pairKey(id1, id2) { return [id1, id2].sort().join("|"); }
+function clientSub(c) { return esc([c.yomi, c.address, c.tel, c.note].filter(Boolean).join(" ・ ")) || "(住所・電話なし)"; }
+
+function closeMerge() { document.getElementById("mergeModalBg").classList.remove("show"); }
+
+// 似た名前の一覧
+function openSimilarList() {
+  const ign = new Set(mergeIgnored());
+  const pairs = [];
+  for (let i = 0; i < clients.length; i++) for (let j = i + 1; j < clients.length; j++) {
+    const a = clients[i], b = clients[j];
+    if (ign.has(pairKey(a.id, b.id))) continue;
+    if (isSimilarClient(a, b)) pairs.push([a, b]);
+  }
+  pairs.sort((p, q) => (p[0].yomi || p[0].name).localeCompare(q[0].yomi || q[0].name, "ja"));
+  document.getElementById("mergeTitle").textContent = `🔍 似た名前の取引先(${pairs.length}組)`;
+  const side = (keep, drop) => `
+      <div style="flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:12px;padding:10px;">
+        <div style="font-weight:700;font-size:15px;word-break:break-all;">${esc(keep.name)}</div>
+        <div style="font-size:12px;color:#64748b;margin:4px 0 8px;word-break:break-all;">${clientSub(keep)}</div>
+        <button class="btn btn-main" style="padding:8px;font-size:13px;" onclick="confirmMerge('${drop.id}','${keep.id}')">こちらを残す</button>
+      </div>`;
+  document.getElementById("mergeBody").innerHTML = pairs.length ? `
+    <div class="hint" style="margin-bottom:12px;font-size:13px;color:#475569;line-height:1.6;">同じ会社なら<b>正しいほうの「こちらを残す」</b>を押してください。カレンダーの予定・電話依頼の会社名も付け替えて、もう片方を消します。<br>別の会社なら「別の会社」を押すと、この一覧に出なくなります。</div>
+    ${pairs.map(([a, b]) => `
+    <div style="background:#f8fafc;border-radius:14px;padding:10px;margin-bottom:10px;">
+      <div style="display:flex;gap:8px;">${side(a, b)}${side(b, a)}</div>
+      <button class="btn btn-sub" style="margin-top:8px;padding:8px;font-size:13px;" onclick="ignorePair('${a.id}','${b.id}')">別の会社(この組は今後出さない)</button>
+    </div>`).join("")}` : `<div class="empty">似た名前の取引先は見つかりませんでした 🎉</div>`;
+  document.getElementById("mergeModalBg").classList.add("show");
+}
+function ignorePair(id1, id2) {
+  const list = mergeIgnored(); list.push(pairKey(id1, id2));
+  try { localStorage.setItem(MERGE_IGNORE_KEY, JSON.stringify(list)); } catch(e) {}
+  openSimilarList();
+}
+
+// 編集画面から「別の取引先にまとめる」
+function openMergePick() {
+  const from = clients.find(x => x.id === editingClientId);
+  if (!from) return;
+  closeClientEdit();
+  document.getElementById("mergeTitle").textContent = `🔗「${from.name}」をまとめる先を選ぶ`;
+  document.getElementById("mergeBody").innerHTML = `
+    <div class="hint" style="margin-bottom:10px;font-size:13px;color:#475569;line-height:1.6;">残すほう(正しい会社名)を選んでください。「${esc(from.name)}」は消えて、カレンダーの予定・電話依頼は選んだ会社に付け替わります。</div>
+    <input type="text" id="mergeSearch" placeholder="🔍 会社名・よみがなで検索" oninput="renderMergePick('${from.id}')" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;margin-bottom:10px;">
+    <div id="mergePickList"></div>`;
+  renderMergePick(from.id);
+  document.getElementById("mergeModalBg").classList.add("show");
+}
+function renderMergePick(fromId) {
+  const from = clients.find(x => x.id === fromId);
+  if (!from) return;
+  const q = (document.getElementById("mergeSearch").value || "").trim();
+  let list = clients.filter(c => c.id !== fromId);
+  if (q) list = list.filter(c => [c.name, c.yomi].some(v => (v || "").includes(q)));
+  else list = list.filter(c => isSimilarClient(from, c));
+  list.sort((a, b) => (a.yomi || a.name).localeCompare(b.yomi || b.name, "ja"));
+  document.getElementById("mergePickList").innerHTML = list.length ? (!q ? `<div style="font-size:12px;color:#0d9488;font-weight:700;margin-bottom:6px;">似た名前の候補</div>` : "") +
+    list.slice(0, 50).map(c => `
+    <div class="v-card" style="margin:0 0 8px;cursor:pointer;" onclick="confirmMerge('${fromId}','${c.id}')">
+      <div class="v-info"><div class="v-number">${esc(c.name)}</div><div class="v-model">${clientSub(c)}</div></div>
+      <div style="color:#0d9488;font-weight:700;font-size:13px;white-space:nowrap;">ここに<br>まとめる</div>
+    </div>`).join("")
+    : `<div class="empty">${q ? "見つかりません" : "似た名前の候補はありません。上の検索で探してください。"}</div>`;
+}
+
+async function confirmMerge(fromId, toId) {
+  const from = clients.find(x => x.id === fromId), to = clients.find(x => x.id === toId);
+  if (!from || !to) { toast("⚠️ 取引先が見つかりません(画面を開き直してください)"); return; }
+  if (!confirm(`「${from.name}」を消して、\n「${to.name}」にまとめます。\n\n・カレンダーの予定と電話依頼の会社名を「${to.name}」に直します\n・この操作は元に戻せません\n\nよろしいですか?`)) return;
+  toast("⏳ まとめています…");
+  try {
+    // 付け替える予定・電話依頼を集める
+    const evDocs = new Map();
+    const [byId, byName, phones] = await Promise.all([
+      db.collection("calendarEvents").where("clientId", "==", from.id).get(),
+      db.collection("calendarEvents").where("title", "==", from.name).get(),
+      db.collection("phoneRequests").where("client", "==", from.name).get()
+    ]);
+    byId.forEach(d => evDocs.set(d.id, d));
+    byName.forEach(d => evDocs.set(d.id, d));
+    const ops = [];
+    evDocs.forEach(d => ops.push([d.ref, { title: to.name, clientId: to.id, yomi: to.yomi || from.yomi || d.data().yomi || "" }]));
+    phones.forEach(d => ops.push([d.ref, { client: to.name }]));
+    // 残すほうに空欄があれば引き継ぐ
+    const fill = {};
+    ["yomi", "address", "tel"].forEach(k => { if (!(to[k] || "").trim() && (from[k] || "").trim()) fill[k] = from[k]; });
+    if (Object.keys(fill).length) {
+      fill.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      ops.push([db.collection(CLIENT_COL).doc(to.id), fill]);
+    }
+    // 400件ずつ書き込み(1回の上限500件)
+    for (let i = 0; i < ops.length; i += 400) {
+      const batch = db.batch();
+      ops.slice(i, i + 400).forEach(([ref, data]) => batch.update(ref, data));
+      await batch.commit();
+    }
+    await db.collection(CLIENT_COL).doc(from.id).delete();
+    closeMerge();
+    toast(`✅「${to.name}」にまとめました(予定${evDocs.size}件・電話依頼${phones.size}件を付け替え)`);
+  } catch(e) {
+    console.error(e);
+    toast("⚠️ まとめられませんでした。通信を確認して、もう一度お試しください");
+  }
+}
+
+/* ---------- PWAインストール ---------- */
+let deferredPrompt = null;
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById("installBtn").style.display = "block";
+});
+function installApp() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(() => {
+    deferredPrompt = null;
+    document.getElementById("installBtn").style.display = "none";
+  });
+}
+window.addEventListener("appinstalled", () => {
+  document.getElementById("installBtn").style.display = "none";
+});
+
+/* ---------- トースト ---------- */
+let toastTimer;
+/* ---------- 契約マスタ ---------- */
+const CONTRACT_COL = "master_contracts";
+/* 契約を保存・削除したら、更新日時を master_meta/contracts に記録(ISO管理の「契約件数」に最終更新日として出る) */
+function stampContractUpdate(action){
+  return db.collection("master_meta").doc("contracts").set({ updatedAt: firebase.firestore.FieldValue.serverTimestamp(), updatedMs: Date.now(), lastAction: action || "" }, { merge: true }).catch(e => console.error(e));
+}
+let contracts = [];
+let contractsLoaded = false;
+function contractDocId(sheet, company, route){
+  return encodeURIComponent(sheet + "|" + company + "|" + route).replace(/%/g, "_").slice(0, 1400);
+}
+function contractContentDisp(s){
+  const t = (s || "").trim();
+  if (t === "〇" || t === "○" || t === "0") return "契約あり（日付不明）";
+  return t;
+}
+async function loadContracts(force){
+  if (contractsLoaded && !force) { renderContracts(); return; }
+  try {
+    const results = await Promise.all([db.collection(CONTRACT_COL).get(), db.collection(YOMI_COL).get()]);
+    contracts = results[0].docs.map(d => Object.assign({ id: d.id }, d.data()));
+    companyYomi = {};
+    results[1].docs.forEach(d => { const v = d.data(); if (v.name) companyYomi[v.name] = v.yomi || ""; });
+    contractsLoaded = true;
+    renderContracts();
+  } catch (e) {
+    document.getElementById("contractList").innerHTML = '<div style="text-align:center;color:#ef4444;padding:20px;">読み込みに失敗しました</div>';
+  }
+}
+let mDispFilter = ""; // ""=すべて / "＿memo＿" / "d:"+正規化処分先
+let mSheetFilter = ""; // ""=すべて / "s:"+正規化シート名
+let mSheetVals = [];
+let mDispVals = [];
+/* 表記ゆれ吸収（全角半角・スペース・㈱／（株）／株式会社など） */
+function mNorm(s){
+  return (s || "").normalize("NFKC")
+    .replace(/\s+/g, "")
+    .replace(/株式会社|\(株\)|㈱|有限会社|\(有\)|㈲/g, "")
+    .toLowerCase();
+}
+let mCompNames = [];
+let mCompGroups = [];
+let mKanaFilter = "";
+let companyYomi = {};
+const M_KANA_ROWS = [
+{label:"あ",chars:"あいうえおぁぃぅぇぉ"},
+{label:"か",chars:"かきくけこがぎぐげご"},
+{label:"さ",chars:"さしすせそざじずぜぞ"},
+{label:"た",chars:"たちつてとだぢづでどっ"},
+{label:"な",chars:"なにぬねの"},
+{label:"は",chars:"はひふへほばびぶべぼぱぴぷぺぽ"},
+{label:"ま",chars:"まみむめも"},
+{label:"や",chars:"やゆよゃゅょ"},
+{label:"ら",chars:"らりるれろ"},
+{label:"わ",chars:"わをん"}
+];
+function mKanaOf(name){
+  const y = companyYomi[name] || ((clients.find(x => x.name === name) || {}).yomi || "");
+  if (!y) return "他";
+  const c = y.trim().charAt(0);
+  for (const r of M_KANA_ROWS) { if (r.chars.indexOf(c) >= 0) return r.label; }
+  return "他";
+}
+window.setMKana = function(k){ mKanaFilter = k; renderContracts(); };
+const YOMI_COL = "master_company_yomi";
+function yomiDocId(name){ return encodeURIComponent(name).replace(/%/g, "_").slice(0, 1400); }
+function ctDispOf(c){ return (c.disposer || "").trim() || ((c.route || "").split("／")[0] || "").trim(); }
+function ctItemOf(c){
+  const disp = ctDispOf(c);
+  const parts = (c.route || "").split("／").map(s => s.trim()).filter(Boolean);
+  const rest = parts.filter(p => p !== disp);
+  return rest.join("／") || c.sheet || "";
+}
+function companyYomiOf(name){
+  if (companyYomi[name]) return companyYomi[name];
+  const cl = clients.find(x => x.name === name);
+  if (cl && cl.yomi) return cl.yomi;
+  return "んんんん" + name;
+}
+window.setMDispIdx = function(i){ mDispFilter = mDispVals[i]; mSheetFilter = ""; renderContracts(); };
+window.setMSheetIdx = function(i){ mSheetFilter = mSheetVals[i]; renderContracts(); };
+let mOpenGroups = {};
+window.toggleMCt = function(id, gkey){
+  const el = document.getElementById(id);
+  const nowOpen = (el.style.display === "none");
+  el.style.display = nowOpen ? "block" : "none";
+  if (gkey) mOpenGroups[gkey] = nowOpen;
+};
+window.moveContract = async function(id, dir){
+  const g = mCompGroups.find(x => x.items.some(c => c.id === id));
+  if (!g) return;
+  const i = g.items.findIndex(c => c.id === id);
+  const j = i + dir;
+  if (j < 0 || j >= g.items.length) return;
+  const arr = g.items.slice();
+  const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+  try {
+    const batch = db.batch();
+    arr.forEach((c, idx2) => {
+      c.sortOrder = idx2;
+      batch.update(db.collection(CONTRACT_COL).doc(c.id), { sortOrder: idx2 });
+    });
+    await batch.commit();
+    renderContracts();
+  } catch (e) { alert("並べ替えを保存できませんでした: " + e.message); }
+};
+window.editCompanyYomiIdx = async function(i){
+  const g = mCompGroups[i];
+  if (!g || g.isMemo) return;
+  const y = prompt(g.names.join("／") + " のよみがな（ひらがな）\n※同じよみがなの会社は1つの排出事業者としてまとまります", g.yomi || "");
+  if (y === null) return;
+  try {
+    for (const name of g.names) {
+      if (y.trim()) {
+        await db.collection(YOMI_COL).doc(yomiDocId(name)).set({ name, yomi: y.trim() });
+        companyYomi[name] = y.trim();
+      } else {
+        await db.collection(YOMI_COL).doc(yomiDocId(name)).delete();
+        delete companyYomi[name];
+      }
+    }
+    renderContracts();
+    toast("よみがなを保存しました");
+  } catch (e) { alert("保存できませんでした: " + e.message); }
+};
+window.openContractEdit = function(id){
+  const c = id ? contracts.find(x => x.id === id) : null;
+  document.querySelector("#contractEditBg h3").textContent = c ? "✏️ 契約を編集" : "＋ 契約を追加";
+  document.getElementById("ceId").value = id || "";
+  document.getElementById("ceCompany").value = c ? (c.isMemo ? "" : (c.company || "")) : "";
+  document.getElementById("ceSheet").value = c ? (c.sheet || "") : "";
+  document.getElementById("ceDisposer").value = c ? (c.isMemo ? "" : ctDispOf(c)) : "";
+  document.getElementById("ceItem").value = c ? (c.isMemo ? "" : ctItemOf(c)) : "";
+  document.getElementById("ceContent").value = c ? (c.content || "") : "";
+  document.getElementById("ceNote").value = c ? (c.note || "") : "";
+  document.getElementById("contractEditBg").classList.add("show");
+};
+window.addContractForCompanyIdx = function(i){
+  openContractEdit(null);
+  const g = mCompGroups[i];
+  document.getElementById("ceCompany").value = (g && !g.isMemo) ? g.names[0] : "";
+};
+window.closeContractEdit = function(){ document.getElementById("contractEditBg").classList.remove("show"); };
+document.querySelectorAll("#contractEditBg input").forEach(inp => {
+  inp.addEventListener("focus", function(){
+    setTimeout(() => { inp.scrollIntoView({ block: "center", behavior: "smooth" }); }, 300);
+  });
+});
+window.saveContractEdit = async function(){
+  const oldId = document.getElementById("ceId").value;
+  const old = contracts.find(x => x.id === oldId);
+  const company = document.getElementById("ceCompany").value.trim();
+  const sheet = document.getElementById("ceSheet").value.trim();
+  const disposer = document.getElementById("ceDisposer").value.trim();
+  const item = document.getElementById("ceItem").value.trim();
+  const content = document.getElementById("ceContent").value.trim();
+  const note = document.getElementById("ceNote").value.trim();
+  if (!sheet || (!company && !content)) { alert("シートと、会社名（または内容）を入力してください"); return; }
+  const isMemo = !company;
+  const route = isMemo ? "" : (disposer && item ? disposer + "／" + item : (disposer || item));
+  const keyName = isMemo ? content : company;
+  const newId = contractDocId(sheet, keyName, route);
+  const data = { sheet, company: isMemo ? "（特記）" : company, route, disposer, content, note, isMemo, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+  try {
+    await db.collection(CONTRACT_COL).doc(newId).set(data);
+    if (oldId && newId !== oldId) await db.collection(CONTRACT_COL).doc(oldId).delete();
+    stampContractUpdate(oldId ? "修正" : "追加");
+    contracts = contracts.filter(x => x.id !== oldId && x.id !== newId).concat([Object.assign({ id: newId }, data)]);
+    closeContractEdit();
+    renderContracts();
+    toast("保存しました");
+  } catch (e) { alert("保存できませんでした: " + e.message); }
+};
+function getFilteredContracts(q){
+  let list = contracts;
+  if (mDispFilter === "＿memo＿") list = list.filter(c => c.isMemo);
+  else if (mDispFilter && mDispFilter.indexOf("d:") === 0) {
+    const key = mDispFilter.slice(2);
+    list = list.filter(c => !c.isMemo && mNorm(ctDispOf(c)) === key);
+  }
+  else list = list.filter(c => !c.isMemo);
+  if (mSheetFilter && mSheetFilter.indexOf("s:") === 0) {
+    const sk = mSheetFilter.slice(2);
+    list = list.filter(c => !c.isMemo && mNorm(c.sheet || "") === sk);
+  }
+  if (mKanaFilter) list = list.filter(c => !c.isMemo && mKanaOf(c.company) === mKanaFilter);
+  if (q) list = list.filter(c =>
+    (c.company || "").includes(q) || (c.route || "").includes(q) || (c.content || "").includes(q) ||
+    (c.sheet || "").includes(q) || (c.note || "").includes(q) || (companyYomi[c.company] || "").includes(q));
+  return list;
+}
+function renderContracts(){
+  const q = (document.getElementById("contractSearchBox").value || "").trim();
+  // 処分先チップ（表記ゆれを吸収して統合・番号方式）
+  const dispGroups = {}; // normKey -> {count, names:{原文:回数}}
+  contracts.filter(c => !c.isMemo).forEach(c => {
+    const d = ctDispOf(c);
+    const k = mNorm(d);
+    if (!dispGroups[k]) dispGroups[k] = { count: 0, names: {} };
+    dispGroups[k].count++;
+    if (d) dispGroups[k].names[d] = (dispGroups[k].names[d] || 0) + 1;
+  });
+  function repName(names){ // 一番よく使われている表記を代表名に（同数なら長い方）
+    let best = "", bn = -1;
+    Object.keys(names).forEach(n => {
+      if (names[n] > bn || (names[n] === bn && n.length > best.length)) { best = n; bn = names[n]; }
+    });
+    return best;
+  }
+  const memoCount = contracts.filter(c => c.isMemo).length;
+  const dispKeys = Object.keys(dispGroups).sort((a, b) => {
+    if (a === "") return 1; if (b === "") return -1; // 不明は最後
+    return repName(dispGroups[a].names).localeCompare(repName(dispGroups[b].names), "ja");
+  });
+  mDispVals = [""].concat(dispKeys.map(k => "d:" + k));
+  const labels = ["すべて"].concat(dispKeys.map(k =>
+    (k === "" ? "処分先不明" : repName(dispGroups[k].names) + "行き") + " " + dispGroups[k].count));
+  if (memoCount) { mDispVals.push("＿memo＿"); labels.push("特記事項（" + memoCount + "）"); }
+  document.getElementById("contractDispChips").innerHTML = labels.map((lb, i) => {
+    const active = (mDispFilter === mDispVals[i]);
+    return '<button onclick="setMDispIdx(' + i + ')" style="border:none;border-radius:10px;padding:7px 11px;font-size:12px;font-weight:700;' + (active ? 'background:#0d9488;color:#fff;' : 'background:#e2e8f0;color:#334155;') + '">' + esc(lb) + '</button>';
+  }).join("");
+  // 品名（シート）チップ：処分先を選んでいるとき、その処分先内のシートを表示
+  const sheetWrap = document.getElementById("contractSheetWrap");
+  if (mDispFilter && mDispFilter.indexOf("d:") === 0) {
+    const dk = mDispFilter.slice(2);
+    const sheetGroups = {};
+    contracts.filter(c => !c.isMemo && mNorm(ctDispOf(c)) === dk).forEach(c => {
+      const sk = mNorm(c.sheet || "");
+      if (!sheetGroups[sk]) sheetGroups[sk] = { count: 0, names: {} };
+      sheetGroups[sk].count++;
+      if (c.sheet) sheetGroups[sk].names[c.sheet] = (sheetGroups[sk].names[c.sheet] || 0) + 1;
+    });
+    const sKeys = Object.keys(sheetGroups).sort((a, b) => a.localeCompare(b, "ja"));
+    mSheetVals = [""].concat(sKeys.map(k => "s:" + k));
+    const sLabels = ["すべて"].concat(sKeys.map(k =>
+      (k === "" ? "シート名なし" : repName(sheetGroups[k].names)) + " " + sheetGroups[k].count));
+    if (mSheetFilter && mSheetVals.indexOf(mSheetFilter) < 0) mSheetFilter = "";
+    document.getElementById("contractSheetChips").innerHTML = sLabels.map((lb, i) => {
+      const active = (mSheetFilter === mSheetVals[i]);
+      return '<button onclick="setMSheetIdx(' + i + ')" style="border:none;border-radius:10px;padding:7px 11px;font-size:12px;font-weight:700;' + (active ? 'background:#d97706;color:#fff;' : 'background:#fef3c7;color:#92400e;') + '">' + esc(lb) + '</button>';
+    }).join("");
+    sheetWrap.style.display = "block";
+  } else {
+    mSheetFilter = "";
+    sheetWrap.style.display = "none";
+  }
+  // かなインデックス
+  const kanaLabels = [""].concat(M_KANA_ROWS.map(r => r.label)).concat(["他"]);
+  document.getElementById("contractKanaChips").innerHTML = kanaLabels.map(k => {
+    const active = (mKanaFilter === k);
+    return '<button onclick="setMKana(\'' + k + '\')" style="border:none;border-radius:10px;padding:7px 11px;font-size:12px;font-weight:700;' + (active ? 'background:#7c3aed;color:#fff;' : 'background:#ede9fe;color:#5b21b6;') + '">' + (k === "" ? "全て" : k) + '</button>';
+  }).join("");
+  // 絞り込み
+  let list = getFilteredContracts(q);
+  const compSet = new Set(contracts.filter(c => !c.isMemo).map(c => c.company));
+  const sheets = {};
+  contracts.forEach(c => { sheets[c.sheet] = (sheets[c.sheet] || 0) + 1; });
+  document.getElementById("contractSummary").textContent =
+    "全体：会社 " + compSet.size + "社・契約 " + contracts.filter(c => !c.isMemo).length + "件（" +
+    Object.keys(sheets).sort().map(s => s + " " + sheets[s] + "件").join("、") + "）　※会社名タップで契約内容、✏️で修正、「よみ」でひらがな登録";
+  // 会社ごと（同じよみがな＝同じ排出事業者としてまとめる。よみがな順）
+  const groupsMap = {};
+  list.forEach(c => {
+    let key;
+    if (c.isMemo) key = "＿memo＿";
+    else { const y = companyYomi[c.company]; key = y ? "y:" + y : "n:" + c.company; }
+    if (!groupsMap[key]) groupsMap[key] = { names: [], items: [], isMemo: !!c.isMemo };
+    if (!c.isMemo && groupsMap[key].names.indexOf(c.company) < 0) groupsMap[key].names.push(c.company);
+    groupsMap[key].items.push(c);
+  });
+  Object.keys(groupsMap).forEach(k => {
+    groupsMap[k].items.sort((a, b) => ((a.sortOrder ?? 9999) - (b.sortOrder ?? 9999)));
+  });
+  mCompGroups = Object.keys(groupsMap).map(k => {
+    const g = groupsMap[k];
+    return {
+      names: g.isMemo ? ["（特記事項）"] : g.names,
+      items: g.items,
+      isMemo: g.isMemo,
+      yomi: g.isMemo ? "" : (companyYomi[g.names[0]] || "")
+    };
+  });
+  mCompGroups.sort((a, b) => {
+    const ya = a.yomi || companyYomiOf(a.names[0]);
+    const yb = b.yomi || companyYomiOf(b.names[0]);
+    return ya.localeCompare(yb, "ja");
+  });
+  const box = document.getElementById("contractList");
+  if (!mCompGroups.length) { box.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:20px;">該当なし（📥から取り込めます）</div>'; return; }
+  box.innerHTML = mCompGroups.map((g, idx) => {
+    const isMemoGroup = g.isMemo;
+    const label = g.names.join("／");
+    const rows = g.items.map(c => {
+      const btns = '<div style="display:flex;flex-direction:column;gap:4px;">' +
+        '<button onclick="openContractEdit(\'' + c.id + '\')" style="border:none;background:#e0f2fe;color:#0369a1;border-radius:8px;padding:4px 8px;font-size:12px;">✏️</button>' +
+        '<button onclick="deleteContract(\'' + c.id + '\')" style="border:none;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:4px 8px;font-size:12px;">🗑</button>' +
+        '<button onclick="moveContract(\'' + c.id + '\',-1)" style="border:none;background:#f1f5f9;color:#334155;border-radius:8px;padding:4px 8px;font-size:12px;">▲</button>' +
+        '<button onclick="moveContract(\'' + c.id + '\',1)" style="border:none;background:#f1f5f9;color:#334155;border-radius:8px;padding:4px 8px;font-size:12px;">▼</button></div>';
+      if (c.isMemo) {
+        return '<div style="border-bottom:1px dashed #e2e8f0;padding:6px 0;display:flex;gap:6px;"><div style="flex:1;font-size:12px;"><span style="background:#e0f2fe;color:#0369a1;border-radius:6px;padding:1px 6px;font-weight:700;">' + esc(c.sheet) + '</span>　' + esc(c.content) + '</div>' + btns + '</div>';
+      }
+      return '<div style="border-bottom:1px dashed #e2e8f0;padding:6px 0;display:flex;gap:6px;align-items:flex-start;">' +
+        '<div style="flex:1;font-size:12px;line-height:1.7;">' +
+        (g.names.length > 1 ? '<span style="color:#94a3b8;">［' + esc(c.company) + '］</span><br>' : '') +
+        '<b>品名：</b>' + esc(ctItemOf(c)) + '<span style="color:#94a3b8;">（' + esc(c.sheet) + '）</span><br>' +
+        '<b>処分先：</b>' + (ctDispOf(c) ? esc(ctDispOf(c)) : '<span style="color:#ef4444;">（不明・✏️で入力できます）</span>') + '<br>' +
+        '<b>契約日：</b>' + esc(contractContentDisp(c.content)) +
+        (c.note ? '<br><span style="color:#b45309;">📝 備考：' + esc(c.note) + '</span>' : '') +
+        '</div>' + btns + '</div>';
+    }).join("");
+    const detailId = "mctd" + idx;
+    const gkey = isMemoGroup ? "＿memo＿" : (g.yomi ? "y:" + g.yomi : "n:" + g.names[0]);
+    const open = (mOpenGroups[gkey] || isMemoGroup || q || mDispFilter === "＿memo＿") ? "block" : "none";
+    const dspList = isMemoGroup ? "" : Array.from(new Set(g.items.filter(c => !c.isMemo).map(c => ctDispOf(c) || "不明"))).join("・");
+    return '<div style="border:1px solid #e2e8f0;border-radius:12px;padding:8px 10px;margin-bottom:8px;">' +
+      '<div style="display:flex;align-items:center;gap:8px;">' +
+      '<div style="flex:1;font-size:13px;font-weight:700;cursor:pointer;" onclick="toggleMCt(\'' + detailId + '\',\'' + esc(gkey).replace(/'/g,"") + '\')">' + esc(label) +
+      '<span style="color:#94a3b8;font-weight:400;font-size:11px;">　' + (g.yomi ? esc(g.yomi) : (isMemoGroup ? "" : "よみ未登録")) + '　' + g.items.length + '件 ▼</span>' +
+      (dspList ? '<div style="font-size:11px;font-weight:400;color:#0d9488;">→ ' + esc(dspList) + '</div>' : '') + '</div>' +
+      (isMemoGroup ? '' : '<button onclick="addContractForCompanyIdx(' + idx + ')" style="border:none;background:#d1fae5;color:#065f46;border-radius:8px;padding:5px 9px;font-size:11px;font-weight:700;">＋</button>' +
+      '<button onclick="editCompanyYomiIdx(' + idx + ')" style="border:none;background:#fef3c7;color:#92400e;border-radius:8px;padding:5px 9px;font-size:11px;font-weight:700;">よみ</button>') +
+      '</div>' +
+      '<div id="' + detailId + '" style="display:' + open + ';">' + rows + '</div></div>';
+  }).join("");
+}
+window.deleteContract = async function(id){
+  const c = contracts.find(x => x.id === id);
+  if (!confirm((c ? c.company + " / " + c.sheet : "この契約") + " を削除しますか？")) return;
+  await db.collection(CONTRACT_COL).doc(id).delete();
+  stampContractUpdate("削除");
+  contracts = contracts.filter(x => x.id !== id);
+  renderContracts();
+  toast("削除しました");
+};
+window.addContractManually = function(){ openContractEdit(null); };
+
+
+/* ---------- 業務管理の台帳(vehicleLedger)から取り込み ---------- */
+const LEDGER_COL = "vehicleLedger";
+// マスタ項目 ⇔ 台帳項目 の対応(conflict:true は食い違いを選ばせる項目)
+const LEDGER_FIELDS = [
+  { m:"maker",       l:"companyName",      label:"メーカー",           conflict:true },
+  { m:"model",       l:"bodyShape",        label:"車種(車体の形状)",   conflict:true },
+  { m:"firstReg",    l:"registeredDate",   label:"初年度登録",         conflict:true },
+  { m:"katashiki",   l:"modelType",        label:"型式",               conflict:true },
+  { m:"haikiryo",    l:"engineOutput",     label:"総排気量/定格出力",  conflict:true },
+  { m:"maxLoad",     l:"maxLoad",          label:"最大積載量(kg)",     conflict:true, num:true },
+  { m:"weight",      l:"vehicleWeight",    label:"車両重量(kg)",       conflict:true, num:true },
+  { m:"totalWeight", l:"grossWeight",      label:"車両総重量(kg)",     conflict:true, num:true },
+  { m:"insurer",     l:"insuranceCompany", label:"保険会社",           conflict:true },
+  // 以下は「マスタが空のときだけ埋める」(マスタ側が正なので食い違いは出さない)
+  { m:"nickname",    l:"nickname",         label:"呼び名",             conflict:false },
+  { m:"shakenDate",  l:"shakenDate",       label:"車検満了日",         conflict:false }
+];
+let importPlan = null;
+
+function ledgerKey(s){ return (s||"").toString().normalize("NFKC").replace(/[\s　]/g,"").toLowerCase(); }
+function isBlank(x){ return x===undefined || x===null || String(x).trim()===""; }
+function normCmp(x, num){
+  if (isBlank(x)) return "";
+  let t = String(x).normalize("NFKC").replace(/[\s　,]/g,"").toLowerCase();
+  if (num) { t = t.replace(/kg$/,""); const n = Number(t); if (!isNaN(n)) return String(n); }
+  return t;
+}
+function ledgerVal(f, v){
+  let x = v[f.l];
+  if (isBlank(x)) return "";
+  if (f.m === "nickname") {
+    // 旧データで愛称欄に車番が入っているものは呼び名にしない
+    if (ledgerKey(x) === ledgerKey(v.plateNumber)) return "";
+  }
+  return String(x).trim();
+}
+
+async function openLedgerImport(){
+  document.getElementById("importModalBg").classList.add("show");
+  document.getElementById("importRunBtn").style.display = "none";
+  const body = document.getElementById("importBody");
+  body.innerHTML = "読み込み中…";
+  let ledger;
+  try {
+    const snap = await db.collection(LEDGER_COL).get();
+    ledger = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  } catch(e) {
+    console.error(e);
+    body.innerHTML = "⚠️ 業務管理の台帳を読み込めませんでした(通信を確認してください)";
+    return;
+  }
+  const byNumber = {}, byNick = {};
+  vehicles.forEach(mv => {
+    if (mv.number) byNumber[ledgerKey(mv.number)] = mv;
+    if (mv.nickname) byNick[ledgerKey(mv.nickname)] = mv;
+  });
+  const findMaster = (v) => {
+    const p = ledgerKey(v.plateNumber), n = ledgerKey(v.nickname);
+    return (p && byNumber[p]) || (n && byNumber[n]) || (n && byNick[n]) || (p && byNick[p]) || null;
+  };
+
+  const plan = { updates:{}, fills:[], conflicts:[], news:[], skipped:[], plateFixes:[] };
+  const usedMaster = new Set();
+  ledger.forEach(v => {
+    const mv = findMaster(v);
+    if (!mv) {
+      const number = (v.plateNumber || "").trim();
+      if (!number) { plan.skipped.push(v); return; }
+      if (plan.news.some(n => ledgerKey(n.data.number) === ledgerKey(number))) return;
+      const data = { number };
+      LEDGER_FIELDS.forEach(f => { const lv = ledgerVal(f, v); data[f.m] = lv; });
+      data.insurerMemo = "";
+      plan.news.push({ data, label: (data.nickname ? data.nickname + " / " : "") + number });
+      return;
+    }
+    if (usedMaster.has(mv.id)) return; // 同じ車両が台帳に2件ある場合は1件目だけ
+    usedMaster.add(mv.id);
+    const name = vMainName(mv) + (vPlateOnly(mv) ? " / " + vPlateOnly(mv) : "");
+    // 車番:マスタの車番欄に愛称が入っている／空 → 台帳の本当の車番に直す
+    let plateFixed = false;
+    const lp = (v.plateNumber || "").trim();
+    if (lp && ledgerKey(lp) !== ledgerKey(mv.number)) {
+      const takenByOther = vehicles.some(o => o.id !== mv.id && ledgerKey(o.number) === ledgerKey(lp));
+      const numIsName = !mv.number || ledgerKey(mv.number) === ledgerKey(mv.nickname) || ledgerKey(mv.number) === ledgerKey(v.nickname);
+      if (!takenByOther && numIsName) {
+        plan.plateFixes.push({ id:mv.id, name: vMainName(mv), from: mv.number || "(空)", to: lp, keepNick: mv.nickname ? "" : (mv.number || "") });
+        plateFixed = true;
+      } else if (!takenByOther) {
+        plan.conflicts.push({ id:mv.id, lid:v.id, name, f:{ m:"number", l:"plateNumber", label:"車番" }, master:String(mv.number), ledger:lp });
+      }
+    }
+    LEDGER_FIELDS.forEach(f => {
+      const lv = ledgerVal(f, v);
+      if (plateFixed && f.m === "nickname") return; // 愛称は元の名前を残す
+      const cur = mv[f.m];
+      if (isBlank(lv)) return;
+      if (isBlank(cur)) {
+        plan.fills.push({ id:mv.id, name, f, val:lv });
+      } else if (f.conflict && normCmp(cur, f.num) !== normCmp(lv, f.num)) {
+        plan.conflicts.push({ id:mv.id, lid:v.id, name, f, master:String(cur), ledger:lv });
+      }
+    });
+  });
+  importPlan = plan;
+  renderImportPlan();
+}
+
+function renderImportPlan(){
+  const p = importPlan, body = document.getElementById("importBody");
+  if (!p.fills.length && !p.conflicts.length && !p.news.length && !p.plateFixes.length) {
+    body.innerHTML = `<div style="padding:16px;text-align:center;color:#0f766e;font-weight:bold;">✅ 食い違いはありません<br><span style="font-weight:normal;font-size:13px;color:#64748b;">台帳とマスタの車両情報はそろっています</span></div>`;
+    document.getElementById("importRunBtn").style.display = "none";
+    return;
+  }
+  let h = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+    <span class="badge" style="background:#fef3c7;color:#92400e;">⚠️ 食い違い ${p.conflicts.length}件</span>
+    <span class="badge" style="background:#dcfce7;color:#166534;">✏️ 空欄を埋める ${p.fills.length}件</span>
+    <span class="badge" style="background:#dbeafe;color:#1e40af;">➕ マスタに新規登録 ${p.news.length}台</span>
+    <span class="badge" style="background:#ede9fe;color:#5b21b6;">🚘 車番を直す ${p.plateFixes.length}台</span>
+  </div>`;
+
+  if (p.plateFixes.length) {
+    h += `<div style="font-weight:bold;margin:8px 0 4px;">🚘 車番の欄に愛称が入っている車両(台帳の車番に直します)</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:6px;">愛称はそのまま残ります。違うものはチェックを外してください。</div>`;
+    p.plateFixes.forEach((x, i) => {
+      h += `<label style="display:flex;align-items:center;gap:6px;padding:4px 0;"><input type="checkbox" id="pf${i}" checked> <b>${esc(x.name)}</b>:${esc(x.from)} → <b>${esc(x.to)}</b></label>`;
+    });
+  }
+
+  if (p.conflicts.length) {
+    h += `<div style="font-weight:bold;margin:8px 0 4px;">⚠️ 食い違い(残す方を選んでください)</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:6px;">車検証を見て正しい方を選んでください。最初は「マスタ(今のまま)」が選ばれています。</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <button class="btn btn-sub" style="flex:1;font-size:12px;padding:6px;" onclick="setAllConflicts('master')">全部マスタにする</button>
+        <button class="btn btn-sub" style="flex:1;font-size:12px;padding:6px;" onclick="setAllConflicts('ledger')">全部台帳にする</button>
+      </div>`;
+    let lastName = null;
+    p.conflicts.forEach((c, i) => {
+      if (c.name !== lastName) { h += `<div style="margin-top:10px;font-weight:bold;color:#0d9488;">🚚 ${esc(c.name)}</div>`; lastName = c.name; }
+      h += `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px 10px;margin-top:4px;">
+        <div style="font-size:12px;color:#92400e;margin-bottom:4px;">${esc(c.f.label)}</div>
+        <label style="display:flex;align-items:center;gap:6px;padding:3px 0;"><input type="radio" name="cf${i}" value="master" checked> マスタ:<b>${esc(c.master)}</b></label>
+        <label style="display:flex;align-items:center;gap:6px;padding:3px 0;"><input type="radio" name="cf${i}" value="ledger"> 台帳:<b>${esc(c.ledger)}</b></label>
+      </div>`;
+    });
+  }
+  if (p.news.length) {
+    h += `<div style="font-weight:bold;margin:16px 0 4px;">➕ マスタにない車両(新しく登録します)</div>`;
+    p.news.forEach((n, i) => {
+      h += `<label style="display:flex;align-items:center;gap:6px;padding:4px 0;"><input type="checkbox" id="nw${i}" checked> ${esc(n.label)}</label>`;
+    });
+    h += `<div style="font-size:12px;color:#64748b;">いらない車両(廃車など)はチェックを外してください</div>`;
+  }
+  if (p.fills.length) {
+    h += `<details style="margin-top:16px;"><summary style="font-weight:bold;cursor:pointer;">✏️ マスタの空欄を台帳の値で埋める(${p.fills.length}件)</summary>`;
+    let lastName = null;
+    p.fills.forEach(fl => {
+      if (fl.name !== lastName) { h += `<div style="margin-top:8px;font-weight:bold;color:#0d9488;">🚚 ${esc(fl.name)}</div>`; lastName = fl.name; }
+      h += `<div style="font-size:13px;padding:2px 0 2px 8px;">${esc(fl.f.label)}:${esc(fl.val)}</div>`;
+    });
+    h += `</details>`;
+  }
+  if (p.skipped.length) {
+    h += `<div style="font-size:12px;color:#94a3b8;margin-top:12px;">※車番が空の台帳データ ${p.skipped.length}件は取り込みません</div>`;
+  }
+  body.innerHTML = h;
+  document.getElementById("importRunBtn").style.display = "";
+}
+
+function setAllConflicts(which){
+  importPlan.conflicts.forEach((c, i) => {
+    const r = document.querySelector(`input[name="cf${i}"][value="${which}"]`);
+    if (r) r.checked = true;
+  });
+}
+
+async function runLedgerImport(){
+  const p = importPlan; if (!p) return;
+  const updates = {};
+  const add = (id, k, v) => { (updates[id] = updates[id] || {})[k] = v; };
+  p.fills.forEach(fl => add(fl.id, fl.f.m, fl.val));
+  p.plateFixes.forEach((x, i) => {
+    const cb = document.getElementById("pf" + i);
+    if (!cb || !cb.checked) return;
+    add(x.id, "number", x.to);
+    if (x.keepNick) add(x.id, "nickname", x.keepNick);
+  });
+  // 「マスタ」を選んだ項目は、台帳側もマスタの値にそろえる(次回また食い違いとして出ないように)
+  const ledgerUpdates = {};
+  p.conflicts.forEach((c, i) => {
+    const r = document.querySelector(`input[name="cf${i}"]:checked`);
+    if (r && r.value === "ledger") add(c.id, c.f.m, c.ledger);
+    else if (c.lid) {
+      let val = c.master;
+      if (c.f.num) { const n = Number(String(val).normalize("NFKC").replace(/[,\s]/g,"")); val = isNaN(n) ? val : n; }
+      (ledgerUpdates[c.lid] = ledgerUpdates[c.lid] || {})[c.f.l] = val;
+    }
+  });
+  const newList = p.news.filter((n, i) => { const cb = document.getElementById("nw" + i); return cb && cb.checked; });
+  const nUpd = Object.keys(updates).length;
+  const nLed = Object.keys(ledgerUpdates).length;
+  if (!nUpd && !newList.length && !nLed) { toast("変更はありません"); closeLedgerImport(); return; }
+  if (!confirm(`マスタの車両 ${nUpd}台を更新、${newList.length}台を新規登録${nLed ? `、業務管理の台帳 ${nLed}台をマスタの値にそろえ` : ""}ます。よろしいですか?`)) return;
+  const btn = document.getElementById("importRunBtn");
+  btn.disabled = true; btn.textContent = "取り込み中…";
+  try {
+    const ts = firebase.firestore.FieldValue.serverTimestamp();
+    const batch = db.batch();
+    Object.entries(updates).forEach(([id, data]) => batch.update(db.collection(COL).doc(id), { ...data, updatedAt: ts }));
+    newList.forEach(n => batch.set(db.collection(COL).doc(), { ...n.data, createdAt: ts, updatedAt: ts }));
+    Object.entries(ledgerUpdates).forEach(([lid, data]) => batch.update(db.collection(LEDGER_COL).doc(lid), { ...data, updatedAt: ts }));
+    await batch.commit();
+    toast("✅ 取り込みました");
+    // 取り込み後にもう一度見くらべて結果を表示
+    setTimeout(openLedgerImport, 600);
+  } catch(e) {
+    console.error(e);
+    toast("⚠️ 取り込みに失敗しました");
+  } finally {
+    btn.disabled = false; btn.textContent = "この内容で取り込む";
+  }
+}
+function closeLedgerImport(){
+  document.getElementById("importModalBg").classList.remove("show");
+  importPlan = null;
+}
+
+/* ---------- 就業カレンダー(workCalendars/{会社}_{開始日} に1期間=1件) ----------
+   { owner:"sekine", ownerName, start:"2026-03-21", end:"2027-03-20", days:{日付:"全休"|"A"|"B"}, overrides:{日付:"全休"|"A"|"B"|"出勤"} }
+   days = 写真から作った内容、overrides = 手で直した臨時休み・取り消し(days より優先)。記載のない日は出勤、どの期間にも入らない日は「未登録」。
+   owner を変えれば他社(引取先)の休業日も同じ形で持てる */
+const WORKCAL_COL = "workCalendars";
+const WORKCAL_OWNER = "sekine", WORKCAL_OWNER_NAME = "関根商店";
+const WORKCAL_LABEL = { "全休":"全休", A:"A班休み", B:"B班休み", "出勤":"出勤" };
+const WORKCAL_SHORT = { "全休":"全休", A:"A班休", B:"B班休" };
+/* 色は紙の就業カレンダーに合わせる: 全休=ピンク / A班=黄緑 / B班=水色 */
+const WORKCAL_COLOR = { "全休":"#c2185b", A:"#4d7c0f", B:"#1d4ed8" };
+const WORKCAL_BG    = { "全休":"#fce4ec", A:"#e6f4c8", B:"#dbeafe" };
+const WORKCAL_LINE  = { "全休":"#e57399", A:"#8bc34a", B:"#5b9bd5" };
+let workCals = [], workcalY = 0, workcalM = 0;
+function wcYmd(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+function workcalPeriodOf(ds){ return workCals.find(c => c.start <= ds && ds <= c.end) || null; }
+/* その日の区分。"全休"|"A"|"B"|""(出勤)、null = 未登録 */
+function workDayOf(ds){
+  const c = workcalPeriodOf(ds); if (!c) return null;
+  const o = (c.overrides || {})[ds];
+  if (o) return o === "出勤" ? "" : o;
+  return (c.days || {})[ds] || "";
+}
+db.collection(WORKCAL_COL).where("owner", "==", WORKCAL_OWNER).onSnapshot(snap => {
+  workCals = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => a.start < b.start ? -1 : 1);
+  renderWorkcalWarn();
+  if (document.getElementById("tabWorkcal").style.display === "block") renderWorkcal();
+  if (document.getElementById("workcalDayBg").classList.contains("show")) renderWorkcalDay();
+}, err => { console.error(err); toast("⚠️ 就業カレンダーの読み込みエラー"); });
+/* 3月に入ったら、3/21からの期間が未登録なら知らせる(今日が未登録のときも) */
+function renderWorkcalWarn(){
+  const now = new Date(), today = wcYmd(now), el = document.getElementById("workcalWarn");
+  let msg = "";
+  if (!workcalPeriodOf(today)) msg = "⚠️ 今日(" + (now.getMonth()+1) + "/" + now.getDate() + ")を含む就業カレンダーが未登録です";
+  else if (now.getMonth() === 2 && !workcalPeriodOf(now.getFullYear() + "-03-21")) msg = "⚠️ 3/21以降の就業カレンダーが未登録です";
+  el.innerHTML = msg ? esc(msg) + '<div style="font-size:12px;font-weight:400;margin-top:2px;">押すと登録の画面を開きます</div>' : "";
+  el.style.display = msg ? "block" : "none";
+}
+function renderWorkcal(){
+  const box = document.getElementById("workcalPeriods");
+  box.innerHTML = workCals.length ? workCals.map(c => {
+    const n = { "全休":0, A:0, B:0 };
+    Object.values(c.days || {}).forEach(v => { if (n[v] !== undefined) n[v]++; });
+    const ov = Object.keys(c.overrides || {}).length;
+    return `<div style="border:1.5px solid #cbd5e1;border-radius:12px;padding:10px 12px;margin-bottom:8px;">
+      <div style="font-weight:700;">${esc(c.start.replace(/-/g,"/"))} 〜 ${esc(c.end.replace(/-/g,"/"))}</div>
+      <div style="font-size:12px;color:#64748b;margin-top:2px;"><span style="color:${WORKCAL_COLOR["全休"]};font-weight:700;">全休 ${n["全休"]}日</span>・<span style="color:${WORKCAL_COLOR.A};font-weight:700;">A班休み ${n.A}日</span>・<span style="color:${WORKCAL_COLOR.B};font-weight:700;">B班休み ${n.B}日</span>${ov ? "・手で直した日 " + ov + "日" : ""}</div>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button onclick="openWorkcalMonth('${c.start}')" style="border:none;background:#e0f2fe;color:#0369a1;border-radius:8px;padding:8px 12px;">📅 見る・直す</button>
+        <button onclick="deleteWorkcal('${c.id}')" style="border:none;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:8px 12px;">🗑</button>
+      </div></div>`;
+  }).join("") : '<div class="empty" style="padding:16px;">まだ登録されていません</div>';
+  const mb = document.getElementById("workcalMonthBox");
+  if (!workcalY && workCals.length){ const t = new Date(); workcalY = t.getFullYear(); workcalM = t.getMonth(); }
+  mb.style.display = workCals.length ? "block" : "none";
+  if (workCals.length) renderWorkcalMonth();
+}
+window.openWorkcalMonth = function(start){
+  workcalY = Number(start.slice(0,4)); workcalM = Number(start.slice(5,7)) - 1;
+  renderWorkcalMonth();
+  document.getElementById("workcalMonthBox").scrollIntoView({ behavior:"smooth" });
+};
+window.workcalMove = function(n){
+  workcalM += n;
+  if (workcalM < 0){ workcalM = 11; workcalY--; } if (workcalM > 11){ workcalM = 0; workcalY++; }
+  renderWorkcalMonth();
+};
+function renderWorkcalMonth(){
+  document.getElementById("workcalMonthTitle").textContent = workcalY + "年" + (workcalM+1) + "月";
+  const first = new Date(workcalY, workcalM, 1), last = new Date(workcalY, workcalM+1, 0).getDate();
+  let html = ["日","月","火","水","木","金","土"].map((w,i) => `<div style="text-align:center;font-size:11px;color:${i===0?"#dc2626":i===6?"#1d4ed8":"#64748b"};">${w}</div>`).join("");
+  for (let i = 0; i < first.getDay(); i++) html += "<div></div>";
+  for (let d = 1; d <= last; d++){
+    const ds = wcYmd(new Date(workcalY, workcalM, d)), w = workDayOf(ds), c = workcalPeriodOf(ds);
+    const manual = c && (c.overrides || {})[ds];
+    const wd = new Date(workcalY, workcalM, d).getDay();
+    html += `<div onclick="openWorkcalDay('${ds}')" style="min-height:52px;border-radius:8px;padding:4px;cursor:pointer;background:${w === null ? "#f1f5f9" : w ? WORKCAL_BG[w] : "#fff"};border:${w ? "2px solid " + WORKCAL_LINE[w] : "1px solid #e2e8f0"};">
+      <div style="font-size:13px;font-weight:700;color:${wd===0?"#dc2626":wd===6?"#1d4ed8":"#1e293b"};">${d}${manual ? '<span style="color:#b45309;font-size:11px;margin-left:2px;">手</span>' : ""}</div>
+      <div style="font-size:11px;font-weight:700;color:${w ? WORKCAL_COLOR[w] : "#94a3b8"};">${w === null ? "未登録" : w ? WORKCAL_SHORT[w] : ""}</div></div>`;
+  }
+  document.getElementById("workcalGrid").innerHTML = html;
+}
+let workcalDay = "";
+window.openWorkcalDay = function(ds){
+  if (!workcalPeriodOf(ds)){ toast("この日を含む就業カレンダーが未登録です"); return; }
+  workcalDay = ds; renderWorkcalDay();
+  document.getElementById("workcalDayBg").classList.add("show");
+};
+window.closeWorkcalDay = function(){ document.getElementById("workcalDayBg").classList.remove("show"); workcalDay = ""; };
+function renderWorkcalDay(){
+  const ds = workcalDay, c = workcalPeriodOf(ds); if (!c) { closeWorkcalDay(); return; }
+  const base = (c.days || {})[ds] || "", o = (c.overrides || {})[ds] || "";
+  const d = new Date(ds + "T00:00:00");
+  document.getElementById("workcalDayTitle").textContent = (d.getMonth()+1) + "/" + d.getDate() + "(" + "日月火水木金土"[d.getDay()] + ")";
+  document.getElementById("workcalDayInfo").innerHTML = "登録した内容: <b>" + (base ? WORKCAL_LABEL[base] : "出勤") + "</b>" +
+    (o ? "<br>手で直した内容: <b style='color:#b45309;'>" + WORKCAL_LABEL[o] + "</b>(こちらが優先)" : "");
+  const cur = o || base || "出勤";
+  document.getElementById("workcalDayBtns").innerHTML = ["出勤","全休","A","B"].map(v =>
+    `<button class="btn ${cur === v ? "btn-main" : "btn-sub"}" onclick="setWorkcalOverride('${v}')">${WORKCAL_LABEL[v]}</button>`).join("") +
+    (o ? `<button class="btn btn-sub" style="grid-column:1/3;color:#b45309;" onclick="setWorkcalOverride('')">↩ 手で直したのを取り消す(登録した内容に戻す)</button>` : "");
+}
+window.setWorkcalOverride = async function(v){
+  const ds = workcalDay, c = workcalPeriodOf(ds); if (!c) return;
+  const base = (c.days || {})[ds] || "出勤";
+  // 登録した内容と同じにするなら、手直しは消す
+  const val = (!v || v === base) ? firebase.firestore.FieldValue.delete() : v;
+  try {
+    await db.collection(WORKCAL_COL).doc(c.id).update({ ["overrides." + ds]: val, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    toast("✅ " + ds.slice(5).replace("-","/") + " を " + WORKCAL_LABEL[v || base] + " にしました");
+  } catch(e){ console.error(e); toast("⚠️ 保存に失敗しました"); }
+};
+/* JSON(写真から作ったもの)を読み込む: { company, period:{start,end}, days:{日付:"全休"|"A"|"B"} } */
+/* 写真から起こした 2026/3/21〜2027/3/20 の就業カレンダー(ファイルを選ばなくても登録できるように) */
+const WORKCAL_BUILTIN_2026 = {"company": "関根商店", "period": {"start": "2026-03-21", "end": "2027-03-20"}, "note": "全休=全員休み / A=A班休み / B=B班休み。記載のない日は出勤日", "days": {"2026-03-21": "B", "2026-03-22": "全休", "2026-03-28": "A", "2026-03-29": "全休", "2026-04-04": "B", "2026-04-05": "全休", "2026-04-11": "A", "2026-04-12": "全休", "2026-04-18": "B", "2026-04-19": "全休", "2026-04-25": "A", "2026-04-26": "全休", "2026-04-29": "B", "2026-05-02": "全休", "2026-05-03": "全休", "2026-05-04": "全休", "2026-05-05": "全休", "2026-05-06": "全休", "2026-05-09": "A", "2026-05-10": "全休", "2026-05-16": "B", "2026-05-17": "全休", "2026-05-23": "A", "2026-05-24": "全休", "2026-05-30": "B", "2026-05-31": "全休", "2026-06-06": "A", "2026-06-07": "全休", "2026-06-13": "B", "2026-06-14": "全休", "2026-06-20": "A", "2026-06-21": "全休", "2026-06-27": "B", "2026-06-28": "全休", "2026-07-04": "A", "2026-07-05": "全休", "2026-07-11": "B", "2026-07-12": "全休", "2026-07-18": "A", "2026-07-19": "全休", "2026-07-20": "A", "2026-07-25": "B", "2026-07-26": "全休", "2026-08-01": "A", "2026-08-02": "全休", "2026-08-08": "B", "2026-08-09": "全休", "2026-08-12": "全休", "2026-08-13": "全休", "2026-08-14": "全休", "2026-08-15": "全休", "2026-08-16": "全休", "2026-08-22": "B", "2026-08-23": "全休", "2026-08-29": "A", "2026-08-30": "全休", "2026-09-05": "B", "2026-09-06": "全休", "2026-09-12": "A", "2026-09-13": "全休", "2026-09-19": "B", "2026-09-20": "全休", "2026-09-21": "B", "2026-09-22": "A", "2026-09-23": "A", "2026-09-26": "A", "2026-09-27": "全休", "2026-10-03": "B", "2026-10-04": "全休", "2026-10-10": "A", "2026-10-11": "全休", "2026-10-12": "B", "2026-10-17": "B", "2026-10-18": "全休", "2026-10-24": "A", "2026-10-25": "全休", "2026-10-31": "B", "2026-11-01": "全休", "2026-11-03": "A", "2026-11-07": "A", "2026-11-08": "全休", "2026-11-14": "B", "2026-11-15": "全休", "2026-11-21": "A", "2026-11-22": "全休", "2026-11-23": "A", "2026-11-28": "B", "2026-11-29": "全休", "2026-12-05": "A", "2026-12-06": "全休", "2026-12-12": "B", "2026-12-13": "全休", "2026-12-19": "A", "2026-12-20": "全休", "2026-12-26": "B", "2026-12-27": "全休", "2026-12-30": "全休", "2026-12-31": "全休", "2027-01-01": "全休", "2027-01-02": "全休", "2027-01-03": "全休", "2027-01-04": "全休", "2027-01-05": "全休", "2027-01-09": "B", "2027-01-10": "全休", "2027-01-11": "B", "2027-01-16": "A", "2027-01-17": "全休", "2027-01-23": "B", "2027-01-24": "全休", "2027-01-30": "A", "2027-01-31": "全休", "2027-02-06": "B", "2027-02-07": "全休", "2027-02-11": "A", "2027-02-13": "A", "2027-02-14": "全休", "2027-02-20": "B", "2027-02-21": "全休", "2027-02-23": "B", "2027-02-27": "A", "2027-02-28": "全休", "2027-03-06": "B", "2027-03-07": "全休", "2027-03-13": "A", "2027-03-14": "全休", "2027-03-20": "B"}};
+window.importWorkcalBuiltin = function(){ importWorkcalText(JSON.stringify(WORKCAL_BUILTIN_2026)); };
+/* iPhoneは accept=".json" だとファイルが灰色で選べないことがあるので、種類で絞らず中身で判断する */
+window.importWorkcalFile = async function(input){
+  const f = input.files && input.files[0]; input.value = "";
+  if (!f) return;
+  let text = "";
+  try { text = await f.text(); } catch(e){ alert("ファイルを読めませんでした。"); return; }
+  importWorkcalText(text);
+};
+window.importWorkcalText = async function(text){
+  let j;
+  try { j = JSON.parse(String(text || "").replace(/^\uFEFF/, "").trim()); }
+  catch(e){ alert("就業カレンダーのJSONとして読めませんでした。\nshugyo-calendar-2026.json を選んでいるか確認してください。"); return; }
+  const isDate = s => /^\d{4}-\d{2}-\d{2}$/.test(s || "");
+  const start = j.period && j.period.start, end = j.period && j.period.end;
+  if (!isDate(start) || !isDate(end) || start > end){ toast("⚠️ period(start・end)が正しくありません"); return; }
+  const days = {}, bad = [];
+  Object.entries(j.days || {}).forEach(([ds, v]) => {
+    if (!isDate(ds) || ds < start || ds > end || !WORKCAL_SHORT[v]) bad.push(ds + ":" + v); else days[ds] = v;
+  });
+  if (bad.length){ alert("読み込めない日があります。JSONを直してください。\n\n" + bad.slice(0,20).join("\n")); return; }
+  const overlap = workCals.filter(c => c.id !== WORKCAL_OWNER + "_" + start && c.start <= end && start <= c.end);
+  if (overlap.length){ alert("ほかの期間と日付が重なっています(" + overlap.map(c => c.start + "〜" + c.end).join("、") + ")。先にそちらを削除してください。"); return; }
+  const id = WORKCAL_OWNER + "_" + start, exists = workCals.some(c => c.id === id);
+  const n = { "全休":0, A:0, B:0 }; Object.values(days).forEach(v => n[v]++);
+  if (!confirm((exists ? "【上書き】" : "") + start.replace(/-/g,"/") + " 〜 " + end.replace(/-/g,"/") + " を登録します。\n\n全休 " + n["全休"] + "日・A班休み " + n.A + "日・B班休み " + n.B + "日\n(記載のない日は出勤)" +
+    (exists ? "\n\n手で直した臨時休みはそのまま残ります。" : ""))) return;
+  try {
+    // days は丸ごと置きかえ、手で直した overrides は残す
+    const old = workCals.find(c => c.id === id);
+    await db.collection(WORKCAL_COL).doc(id).set({
+      owner: WORKCAL_OWNER, ownerName: WORKCAL_OWNER_NAME, start, end, days,
+      overrides: (old && old.overrides) || {},
+      note: String(j.note || ""), updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    openWorkcalMonth(start);
+    document.getElementById("workcalPaste").value = "";
+    toast("✅ 就業カレンダーを登録しました");
+  } catch(e){
+    console.error(e);
+    alert("登録できませんでした。\n" + (e.code === "permission-denied" ? "Firebaseのルールで workCalendars への保存が許可されていません。" : "通信を確認して、もう一度お試しください。") + "\n(" + (e.code || e.message) + ")");
+  }
+};
+window.deleteWorkcal = async function(id){
+  const c = workCals.find(x => x.id === id); if (!c) return;
+  if (!confirm(c.start + " 〜 " + c.end + " の就業カレンダーを削除しますか?\n手で直した臨時休みも消えます。")) return;
+  try { await db.collection(WORKCAL_COL).doc(id).delete(); toast("🗑 削除しました"); }
+  catch(e){ console.error(e); toast("⚠️ 削除に失敗しました"); }
+};
+
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2500);
+}
+</script>
+</body>
+</html>
